@@ -1,0 +1,14 @@
+/coverage
+/examples
+/typings
+/tsd.json
+/tslint.json
+/tsconfig.json
+/.editorconfig
+/.gitattributes
+/.gitignore
+/.npmignore
+/.travis.yml
+
+*.ts
+!*.d.ts

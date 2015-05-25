@@ -1,0 +1,36 @@
+{
+    "version": "1.5.0-alpha",
+    "compilerOptions": {
+        "target": "es5",
+        "module": "commonjs",
+        "declaration": true,
+        "noImplicitAny": true,
+        "removeComments": false,
+        "sourceMap": true,
+        "noLib": false
+    },
+    "filesGlob": [
+        "./**/*.ts",
+        "!./**/*.d.ts",
+        "./typings/**/*.d.ts",
+        "!./node_modules/**/*.ts"
+    ],
+    "files": [
+        "./Stream.ts",
+        "./Transform.ts",
+        "./examples/end.ts",
+        "./examples/hello-world-backpressure.ts",
+        "./examples/hello-world.ts",
+        "./examples/read-errors.ts",
+        "./examples/write-errors.ts",
+        "./examples/write.ts",
+        "./examples/writeEach.ts",
+        "./index.ts",
+        "./test-Stream.ts",
+        "./transformers.ts",
+        "./typings/chai/chai.d.ts",
+        "./typings/mocha/mocha.d.ts",
+        "./typings/node/node.d.ts",
+        "./typings/tsd.d.ts"
+    ]
+}

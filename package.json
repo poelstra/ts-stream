@@ -1,0 +1,36 @@
+{
+  "name": "ts-stream",
+  "version": "0.1.0",
+  "description": "Object streams with backpressure",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha test-*.js",
+    "prepublish": "npm run build && npm run test",
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/poelstra/ts-stream.git"
+  },
+  "keywords": [
+    "stream",
+    "promise",
+    "backpressure",
+    "transform"
+  ],
+  "author": "Martin Poelstra <martin@beryllium.net>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/poelstra/ts-stream/issues"
+  },
+  "homepage": "https://github.com/poelstra/ts-stream#readme",
+  "dependencies": {
+    "ts-promise": "^0.1.5"
+  },
+  "devDependencies": {
+    "chai": "^2.3.0",
+    "istanbul": "^0.3.14",
+    "mocha": "^2.2.5",
+    "source-map-support": "^0.2.10"
+  }
+}
