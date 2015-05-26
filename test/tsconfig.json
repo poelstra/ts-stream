@@ -1,0 +1,23 @@
+{
+    "version": "1.5.0-alpha",
+    "compilerOptions": {
+        "target": "es5",
+        "module": "commonjs",
+        "declaration": true,
+        "noImplicitAny": true,
+        "removeComments": false,
+        "sourceMap": true,
+        "noLib": false,
+        "preserveConstEnums": true,
+        "suppressImplicitAnyIndexErrors": true
+    },
+    "filesGlob": [
+        "../typings/tsd-dev.d.ts",
+        "./**/*.ts",
+        "!./**/*.d.ts"
+    ],
+    "files": [
+        "../typings/tsd-dev.d.ts",
+        "./test-Stream.ts"
+    ]
+}

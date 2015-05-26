@@ -6,14 +6,12 @@
  * License: MIT
  */
 
-/// <reference path="./typings/tsd.d.ts" />
-
 "use strict";
 
 require("source-map-support").install();
 
 import Promise from "ts-promise";
-import { Stream, WriteAfterEndError } from "./index";
+import { Stream, WriteAfterEndError } from "../lib/index";
 import { expect } from "chai";
 
 //Promise.setLongTraces(true);

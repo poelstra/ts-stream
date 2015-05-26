@@ -65,6 +65,11 @@ import Stream from "ts-stream"; // ES6 style
 var Stream = require("ts-stream").Stream; // CommonJS style
 ```
 
+If you're programming in TypeScript, you may need to add the following line to your project:
+```ts
+/// <reference path="./node_modules/ts-stream/ts-stream.d.ts" />
+```
+
 Note: browser support (through browserify) is untested, and may or may not work.
 
 Some examples below use Promises, for which you can use any Promises/A+

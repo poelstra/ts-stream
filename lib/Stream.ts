@@ -6,8 +6,6 @@
  * License: MIT
  */
 
-/// <reference path="./typings/tsd.d.ts" />
-
 "use strict";
 
 import { Promise, Thenable, BaseError } from "ts-promise";

@@ -2,11 +2,12 @@
   "name": "ts-stream",
   "version": "0.1.0",
   "description": "Type-safe object streams with seamless support for backpressure, ending, and error handling",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
-    "test": "mocha test-*.js",
+    "test": "mocha test/test-*.js",
+    "cover": "istanbul cover _mocha -- test/test-*.js",
     "prepublish": "npm run build && npm run test",
-    "build": "tsc"
+    "build": "tsc -p lib/ && tsc -p test/ && dts-generator --name ts-stream --baseDir lib --out ts-stream.d.ts lib/index.ts --main ts-stream/index --es6 --es6default --extern ./node_modules/ts-promise/dist/ts-promise.d.ts"
   },
   "repository": {
     "type": "git",
@@ -27,10 +28,16 @@
   "dependencies": {
     "ts-promise": "^0.1.5"
   },
+  "typescript": {
+    "definition": "./ts-stream.d.ts"
+  },
   "devDependencies": {
     "chai": "^2.3.0",
+    "coveralls": "^2.11.2",
+    "dts-generator": "poelstra/dts-generator#6c96dfba98a467d76071fa67666474f760dab64f",
     "istanbul": "^0.3.14",
     "mocha": "^2.2.5",
-    "source-map-support": "^0.2.10"
+    "source-map-support": "^0.2.10",
+    "typescript": "^1.5.0-beta"
   }
 }
