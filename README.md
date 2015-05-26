@@ -280,6 +280,10 @@ items will be added to this list though...):
 
 # Changelog
 
+0.1.1:
+- Add ts-stream.d.ts file for consumption by other TS modules
+- Readme updates
+
 0.1.0:
 - Initial version
 
