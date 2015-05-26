@@ -50,6 +50,26 @@ instead.
 
 These examples can also be found in the `examples/` folder on GitHub.
 
+## Installation
+
+To use the package in your own program:
+```sh
+cd your-package
+npm install --save ts-stream
+```
+
+Then, include the library using:
+```js
+import Stream from "ts-stream"; // ES6 style
+// or
+var Stream = require("ts-stream").Stream; // CommonJS style
+```
+
+Note: browser support (through browserify) is untested, and may or may not work.
+
+Some examples below use Promises, for which you can use any Promises/A+
+compliant library or native Promises, if available.
+
 ## Simple mapping transform
 
 Hello world example:
@@ -220,6 +240,25 @@ to handle such cases.
 
 Feedback on what you like and dislike about the API is welcome! Just file an
 issue on the Github project!
+
+# Development
+
+Want to fiddle with the sources?
+
+```sh
+git clone https://github.com/poelstra/ts-stream
+cd ts-stream
+npm install
+```
+
+This will automatically install all (development-)dependencies, compile and run
+unit tests.
+
+Run `npm run build` and `npm test` to recompile and run the tests again.
+
+If you want to debug the Typescript code, it may be helpful to use the
+sourcemaps provided during compile. Just `require("source-map-support").install();`
+in your program.
 
 # TODO
 
