@@ -1,7 +1,7 @@
 {
   "name": "ts-stream",
   "version": "0.1.0",
-  "description": "Object streams with backpressure",
+  "description": "Type-safe object streams with seamless support for backpressure, ending, and error handling",
   "main": "index.js",
   "scripts": {
     "test": "mocha test-*.js",
