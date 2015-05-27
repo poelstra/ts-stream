@@ -19,8 +19,12 @@ import { expect } from "chai";
 function readInto<T>(stream: Stream<T>, into: T[]): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
 		stream.forEach(
-			(value: T) => { into.push(value); },
-			(err?: Error) => {
+			function(value: T) {
+				expect(this).to.equal(undefined);
+				into.push(value);
+			},
+			function(err?: Error) {
+				expect(this).to.equal(undefined);
 				if (err)
 					reject(err);
 				else

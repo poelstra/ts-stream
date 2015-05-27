@@ -13,24 +13,125 @@ import * as assert from "assert";
 
 import { Transform, map, filter } from "./Transform";
 
+/**
+ * Required methods for the readable part of a stream.
+ */
 export interface Readable<T> {
+	/**
+	 * Read all values from stream, optionally waiting for explicit stream end.
+	 *
+	 * `reader` will be called for every written value, `ender` will be called
+	 * once when the stream has ended.
+	 *
+	 * `ender` receives the error in case the stream was `end()`'ed with and
+	 * error or `abort()`'ed, or `undefined` in case of a normal stream end.
+	 *
+	 * Both callbacks can return a promise to indicate when the value (or
+	 * end-of-stream condition) has been completely processed. This ensures that
+	 * a fast writer can never overload a slow reader, and is called
+	 * 'backpressure'.
+	 *
+	 * The corresponding `write()` or `end()` operation is blocked until the
+	 * value returned from the callback is resolved. If the callback throws an
+	 * error or the returned promise resolves to a rejection, the promise
+	 * returned by the write call will be rejected with it.
+	 *
+	 * It is guaranteed that the callbacks will be called asynchronously (i.e.
+	 * some time after `forEach()` returns), and their `this` argument will be
+	 * undefined.
+	 * It is also guaranteed that the reader is never called again before its
+	 * previously returned promise is resolved/rejected.
+	 * The ender will also typically be called after all reads have finished,
+	 * but may be called while a read handler's returned promise is still
+	 * pending, if the stream is `abort()`'ed.
+	 *
+	 * If no `ender` is given, a default end handler is installed that returns
+	 * any stream end errors to the writer, and otherwise directly acknowledges
+	 * the end-of-stream.
+	 *
+	 * @param reader Callback called with every written value
+	 * @param ender  Callback called when stream ended
+	 */
 	forEach(reader: (value: T) => void|Thenable<void>, ender?: (error?: Error) => void|Thenable<void>): void;
+
+	/**
+	 * Abort the stream with an error.
+	 * This will abort any pending and future writes, and signal stream end with
+	 * this error to `forEach()`'s end handler.
+	 *
+	 * If the stream's end handler has already been called, the abort is
+	 * ignored.
+	 * Note: a pending read cannot be aborted, but the end callback of `forEach`
+	 * will be called regardless.
+	 */
 	abort(reason: Error): void;
 }
 
+/**
+ * Required methods for the writable part of a stream.
+ */
 export interface Writable<T> {
+	/**
+	 * Write value (or promise for value) to stream.
+	 *
+	 * Writer is blocked until the value is read by the read handler passed to
+	 * `forEach()`, and the value returned by that read handler is resolved.
+	 *
+	 * When the written value is a promise that resolves to a rejection, the
+	 * stream will be ended with that error and any further writes will lead to
+	 * a `WriteAfterEndError`.
+	 *
+	 * It is an error to write an `undefined` value (as this is a common
+	 * programming error). Writing a promise for a void is currently allowed,
+	 * but discouraged.
+	 *
+	 * If the read handler throws an error or returns a rejected promise, the
+	 * promise returned by `write()` will be rejected. It is still possible to
+	 * write another value after that, or e.g. `end()` the stream with an error.
+	 *
+	 * @param value Value to write, or promise for it
+	 * @return Void-promise that resolves when value was processed by reader
+	 */
 	write(value: T|Thenable<T>): Promise<void>;
+
+	/**
+	 * End the stream, optionally passing an error.
+	 *
+	 * Already pending writes will be processed by the reader passed to
+	 * `forEach()` before passing the end-of-stream to its end handler.
+	 *
+	 * The returned promise will resolve after the end handler has finished
+	 * processing. It is rejected if the read handler throws an error or returns
+	 * a rejected Thenable.
+	 *
+	 * All calls to `write()` after `end()` will be rejected with a
+	 * `WriteAfterEndError`.
+	 *
+	 * Note that `write()`ing a rejected promise will also end the stream, and
+	 * a subsequent call to `end()` will also return a `WriteAfterEndError`
+	 * rejection.
+	 *
+	 * @param  error Optional Error to pass to `forEach()` end handler
+	 * @return Void-promise that resolves when end-handler has processed the
+	 *         end-of-stream
+	 */
 	end(error?: Error): Promise<void>;
+
+	/**
+	 * Abort the stream with an error.
+	 * This will abort any pending and future writes, and signal stream end with
+	 * this error to `forEach()`'s end handler.
+	 *
+	 * If the stream's end handler has already been called, the abort is
+	 * ignored.
+	 * Note: a pending read cannot be aborted, but the end callback of `forEach`
+	 * will be called regardless.
+	 */
 	abort(reason: Error): void;
 }
 
-// TODO Update following doc comment when we decide to no longer allow stream
-// end with void-promise.
 /**
  * Thrown when writing to an already-ended stream.
- *
- * Note that a stream can be ended by calling `end()`, but also by writing a
- * rejected promise, or a void-promise.
  */
 export class WriteAfterEndError extends BaseError {
 	constructor() {
@@ -39,6 +140,25 @@ export class WriteAfterEndError extends BaseError {
 }
 
 function noop() { /* no-op */ }
+
+/**
+ * Swallow any error that may result from this promise.
+ * Used during e.g. `abort()`, to ignore potential errors.
+ */
+function swallowErrors(promise: Promise<any>): void {
+	promise.done(noop, noop);
+}
+
+/**
+ * Default end-handler used in e.g. [[Stream.forEach]].
+ * @param err `undefined` in case of normal stream end, or an Error
+ * @return Rejected promise in case of an error, void otherwise
+ */
+function defaultEnder(err?: Error): void|Promise<void> {
+	if (err) {
+		return Promise.reject(err);
+	}
+}
 
 /**
  * Special internal value to indicate 'normal' stream end.
@@ -51,9 +171,10 @@ var eof = new Error("eof");
  */
 interface WriteItem<T> {
 	/**
-	 * Promise for value passed to `write()`
+	 * Promise for value passed to `write()`.
+	 * Either the special value `eof` (Error), or a value of type `T`.
 	 */
-	value: Promise<void|T>;
+	value: Promise<Error|T>;
 
 	/**
 	 * Resolver `write()`'s returned promise
@@ -81,8 +202,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	 * End handler that is called when the stream is ended or aborted, as set by
 	 * `forEach()`. Note that `forEach()` installs a default handler if the user
 	 * did not supply one.
-	 * In case of an aborted stream, this property is unset by `_pump()` after
-	 * it has been called.
+	 * Set to 'undefined' when it has been called.
 	 */
 	private _ender: (error?: Error) => void|Thenable<void>;
 
@@ -112,8 +232,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	private _abortPromise: Promise<void>;
 
 	/**
-	 * Resolved after end-of-stream has been processed by `_ender`.
-	 * TODO Experimental
+	 * Resolved to the result of calling `_ender`.
 	 */
 	private _endDeferred = Promise.defer();
 
@@ -123,16 +242,13 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	 * Writer is blocked until the value is read by the read handler passed to
 	 * `forEach()`, and the value returned by that read handler is resolved.
 	 *
-	 * It is an error to write an `undefined` value (as this is a common
-	 * programming error).
-	 *
 	 * When the written value is a promise that resolves to a rejection, the
 	 * stream will be ended with that error and any further writes will lead to
 	 * a `WriteAfterEndError`.
 	 *
-	 * When the written value is a promise that resolves to `undefined` this is
-	 * equivalent to calling end().
-	 * NOTE: Ending by writing a void-promise may be subject to change.
+	 * It is an error to write an `undefined` value (as this is a common
+	 * programming error). Writing a promise for a void is currently allowed,
+	 * but discouraged.
 	 *
 	 * If the read handler throws an error or returns a rejected promise, the
 	 * promise returned by `write()` will be rejected. It is still possible to
@@ -143,11 +259,12 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	 */
 	write(value: T|Thenable<T>): Promise<void> {
 		if (value === undefined) {
-			// Technically, we could allow this to signal EOF or allow void
-			// values to be written, but it's a common programming error to
-			// forget to return a value, so let's be explicit.
+			// Technically, we could allow this, but it's a common programming
+			// error to forget to return a value, and it's arguable whether it's
+			// useful to have a stream of void's, so let's prevent it for now.
 			// NOTE: This behaviour may change in the future
-			throw new TypeError("cannot write void value, use end() instead");
+			// TODO: prevent writing a void Thenable too?
+			throw new TypeError("cannot write void value, use end() to end the stream");
 		}
 
 		let valuePromise = Promise.resolve(value);
@@ -163,7 +280,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	/**
 	 * End the stream, optionally passing an error.
 	 *
-	 * Any pending writes first still be processed by the reader passed to
+	 * Already pending writes will be processed by the reader passed to
 	 * `forEach()` before passing the end-of-stream to its end handler.
 	 *
 	 * The returned promise will resolve after the end handler has finished
@@ -182,7 +299,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	 *         end-of-stream
 	 */
 	end(error?: Error): Promise<void> {
-		let valuePromise = error ? Promise.reject(error) : Promise.resolve();
+		let valuePromise = error ? Promise.reject(error) : Promise.resolve(eof);
 		let writeDone = Promise.defer();
 		this._writers.push({
 			value: valuePromise,
@@ -209,16 +326,20 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	 * The corresponding `write()` or `end()` operation is blocked until the
 	 * value returned from the callback is resolved. If the callback throws an
 	 * error or the returned promise resolves to a rejection, the promise
-	 * returned by write call will be rejected with it.
+	 * returned by the write call will be rejected with it.
 	 *
-	 * It is guaranteed that the reader is never called again before its
+	 * It is guaranteed that the callbacks will be called asynchronously (i.e.
+	 * some time after `forEach()` returns), and their `this` argument will be
+	 * undefined.
+	 * It is also guaranteed that the reader is never called again before its
 	 * previously returned promise is resolved/rejected.
 	 * The ender will also typically be called after all reads have finished,
-	 * but may be called while a read is still 'pending' when `abort()` is
-	 * called.
+	 * but may be called while a read handler's returned promise is still
+	 * pending, if the stream is `abort()`'ed.
 	 *
 	 * If no `ender` is given, a default end handler is installed that returns
-	 * any stream end errors to the writer.
+	 * any stream end errors to the writer, and otherwise directly acknowledges
+	 * the end-of-stream.
 	 *
 	 * @param reader Callback called with every written value
 	 * @param ender  Callback called when stream ended
@@ -226,11 +347,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	forEach(reader: (value: T) => void|Thenable<void>, ender?: (error?: Error) => void|Thenable<void>): void {
 		assert(!this._reader && !this._ender, "already have a reader");
 		if (!ender) {
-			ender = (err?: Error) => {
-				if (err) {
-					return Promise.reject(err);
-				}
-			};
+			ender = defaultEnder;
 		}
 		this._reader = reader;
 		this._ender = ender;
@@ -239,14 +356,21 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 
 	/**
 	 * Abort the stream with an error.
+	 *
 	 * This will abort any pending and future writes, and signal stream end with
 	 * this error to `forEach()`'s end handler.
 	 *
-	 * If the stream's end handler has already been called, the abort is
-	 * ignored.
+	 * Abort is ignored if the stream's fate is already decided, i.e. already
+	 * aborted, or ended completely (end handler's return value has resolved).
+	 *
+	 * The stream's end handler will only be called if it has not been called
+	 * already.
+	 * If a read handler was called and its return value has not resolved yet,
+	 * the end handler will be called regardless (although it is guaranteed not
+	 * to be called *during* the read handler).
 	 */
 	abort(reason: Error): void {
-		if (this._abortPromise || this._ending || this._ended) {
+		if (!this._endDeferred.promise.isPending()) {
 			return;
 		}
 		this._abortPromise = Promise.reject(reason);
@@ -254,7 +378,12 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 		this._pump();
 	}
 
-	// TODO Experimental
+	/**
+	 * Obtain a promise that resolves when the stream has completely ended, i.e.
+	 * `end()` has been called (possibly with an Error), and the end handler has
+	 * run and its returned promise resolved or rejected.
+	 * @return Promise resolved with the result of `forEach()`'s end handler
+	 */
 	ended(): Promise<void> {
 		return this._endDeferred.promise;
 	}
@@ -396,6 +525,9 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	private _pump(): void {
 		// If aborted, abort all writers, end reader
 		if (this._abortPromise) {
+			// Note: this part may be called multiple times (in case of 'late
+			// arrivals' or writers/reader)
+
 			while (this._writers.length > 0) {
 				let writer = this._writers.shift();
 				writer.resolveWrite(this._abortPromise);
@@ -406,16 +538,21 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 			// 'contract' of not calling one of the callbacks before the
 			// previous one has finished.
 			if (this._readBusy) {
-				this._readBusy.done(noop, noop); // TODO: better way to handle this?
+				swallowErrors(this._readBusy); // TODO: better way to handle this?
 				this._readBusy = undefined;
 			}
-			if (!this._ending && !this._ended && this._ender) {
-				this._ending = this._abortPromise.reason();
-				// Make sure to asynchronously call the end handler, and
-				// maintain long stack traces
-				this._endDeferred.resolve(this._abortPromise.catch(this._ender));
+
+			if (this._ender) {
+				// Make sure to asynchronously call the end handler, without a
+				// `this`, and maintain long stack traces
+				let endResult = this._abortPromise.catch(this._ender);
 				this._ender = undefined;
+				swallowErrors(endResult); // TODO: better way to handle this?
 			}
+
+			this._ending = undefined;
+			this._ended = this._abortPromise.reason();
+			this._endDeferred.resolve(this._abortPromise);
 
 			return;
 		}
@@ -465,11 +602,13 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 		// Handler is always asynchronously called, and by chaining it from
 		// the writer's value, long stack traces are maintained.
 		let fulfilled = writer.value.isFulfilled();
-		if (!fulfilled || writer.value.value() === undefined) {
+		if (!fulfilled || writer.value.value() === eof) {
 			// EOF or error
 			assert(!this._ended && !this._ending);
 			this._ending = fulfilled ? eof : writer.value.reason();
-			this._readBusy = writer.value.then(<() => void|Thenable<void>>this._ender, this._ender);
+			let ender = this._ender; // Ensure calling without `this`
+			this._ender = undefined; // Prevent calling again
+			this._readBusy = writer.value.then(() => ender(), ender);
 		} else {
 			this._readBusy = writer.value.then(this._reader);
 		}
