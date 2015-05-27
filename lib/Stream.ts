@@ -411,7 +411,9 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 			}
 			if (!this._ending && !this._ended && this._ender) {
 				this._ending = this._abortPromise.reason();
-				this._endDeferred.resolve(this._ender(this._ending));
+				// Make sure to asynchronously call the end handler, and
+				// maintain long stack traces
+				this._endDeferred.resolve(this._abortPromise.catch(this._ender));
 				this._ender = undefined;
 			}
 
@@ -459,7 +461,9 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 			return;
 		}
 
-		// Determine whether we should call the reader or the ender
+		// Determine whether we should call the reader or the ender.
+		// Handler is always asynchronously called, and by chaining it from
+		// the writer's value, long stack traces are maintained.
 		let fulfilled = writer.value.isFulfilled();
 		if (!fulfilled || writer.value.value() === undefined) {
 			// EOF or error
