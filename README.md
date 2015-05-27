@@ -7,19 +7,12 @@ It can be used as an easy-to-use alternative to e.g. Node's object-mode Streams,
 both in 'plain' Javascript and TypeScript.
 
 Features:
-- Easy support for backpressure: simply return a promise for asynchronous
-  operations
-- Support for ending a stream (e.g. to flush to file)
-- Stream end can optionally signal an error (pending writes will always be
-  resolved before passing on the EOF or error)
-- Support for abnormal, immediate stream termination (both reader and writer are
-  aborted)
-- Simple signalling of errors by reading side, by returning a (rejected) promise
-  or throwing an error
-- Simple handling of errors by writer: `write()` or `end()` will return a
-  rejected promise
-- Writing a source, sink or transform is easy, even with correct EOF and
-  backpressure handling
+- Type-safe (TypeScript)
+- Promisified interface
+- Easy to implement a stream with error handling and backpressure
+- More options for error handling
+- Support for stream aborting
+- Support for EOF (with or without error)
 - Long stack trace support for errors thrown downstream (i.e. know which
   transform threw an error, and where that value came from)
 
