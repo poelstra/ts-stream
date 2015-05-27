@@ -273,11 +273,18 @@ items will be added to this list though...):
 
 # Changelog
 
-0.1.1:
+0.2.0 (2015-05-27):
+- No longer allow ending stream with write(Promise.resolve()) (undefined value
+  is now passed through, may change in the future)
+- Documentation improvements for methods
+- Simplified and improved abort() logic (see doc comment in source)
+- Ensure callbacks are always called asynchronously, and without a `this`
+
+0.1.1 (2015-05-26):
 - Add ts-stream.d.ts file for consumption by other TS modules
 - Readme updates
 
-0.1.0:
+0.1.0 (2015-05-25):
 - Initial version
 
 # License
