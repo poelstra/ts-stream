@@ -273,6 +273,10 @@ items will be added to this list though...):
 
 # Changelog
 
+0.3.0 (2015-06-10):
+- Introduce ReadableStream and WritableStream interfaces
+- .map() etc no longer return Stream but e.g. ReadableStream
+
 0.2.0 (2015-05-27):
 - No longer allow ending stream with write(Promise.resolve()) (undefined value
   is now passed through, may change in the future)

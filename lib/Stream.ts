@@ -131,6 +131,86 @@ export interface Writable<T> {
 }
 
 /**
+ * Readable part of a generic Stream, which contains handy helpers such as
+ * .map() in addition to the basic requirements of a Readable interface.
+ */
+export interface ReadableStream<T> extends Readable<T> {
+	/**
+	 * Obtain a promise that resolves when the stream has completely ended, i.e.
+	 * `end()` has been called (possibly with an Error), and the end handler has
+	 * run and its returned promise resolved or rejected.
+	 * @return Promise resolved with the result of `forEach()`'s end handler
+	 */
+	ended(): Promise<void>;
+
+	/**
+	 * Run all input values through a mapping callback, which must produce a new
+	 * value (or promise for a value), similar to e.g. `Array`'s `map()`.
+	 *
+	 * Stream end in the input stream (normal or with error) will be passed to
+	 * the returned stream.
+	 *
+	 * @param mapper Callback which receives each value from this stream, and
+	 *               must produce a new value (or promise for a value).
+	 * @return New stream with mapped values.
+	 */
+	map<R>(mapper: (value: T) => R|Thenable<R>): ReadableStream<R>;
+
+	/**
+	 * Run all input values through a filtering callback. If the filter callback
+	 * returns a truthy value (or a promise for a truthy value), the input value
+	 * is written to the output stream, otherwise it is ignored.
+	 * Similar to e.g. `Array`'s `filter()`.
+	 *
+	 * Stream end in the input stream (normal or with error) will be passed to
+	 * the returned stream.
+	 *
+	 * @param filterer Callback which receives each value from this stream,
+	 *                 input value is written to output if callback returns a
+	 *                 (promise for) a truthy value.
+	 * @return New stream with filtered values.
+	 */
+	filter(filterer: (value: T) => boolean|Thenable<boolean>): ReadableStream<T>;
+
+	/**
+	 * Read all values and end-of-stream from this stream, writing them to
+	 * `writable`.
+	 *
+	 * @param  writable Destination stream
+	 * @return The stream passed in, for easy chaining
+	 */
+	pipe(writable: Writable<T>): Writable<T>;
+
+	// TODO Experimental
+	transform<R>(transformer: Transform<T, R>): ReadableStream<R>;
+}
+
+/**
+ * Writable part of a generic Stream, which contains handy helpers such as
+ * .mappedBy() in addition to the basic requirements of a Writable interface.
+ */
+export interface WritableStream<T> extends Writable<T> {
+	/**
+	 * Obtain a promise that resolves when the stream has completely ended, i.e.
+	 * `end()` has been called (possibly with an Error), and the end handler has
+	 * run and its returned promise resolved or rejected.
+	 * @return Promise resolved with the result of `forEach()`'s end handler
+	 */
+	ended(): Promise<void>;
+
+	// TODO Experimental
+	writeEach(writer: () => T|Thenable<T>|void|Thenable<void>): Promise<void>;
+
+	// TODO Experimental
+	// TODO Not sure whether a 'reverse' function confuses more than it helps
+	mappedBy<X>(mapper: (value: X) => T|Thenable<T>): WritableStream<X>;
+
+	// TODO Experimental
+	// TODO Not sure whether a 'reverse' function confuses more than it helps
+	filterBy(filterer: (value: T) => boolean|Thenable<boolean>): WritableStream<T>;
+}
+
+/**
  * Thrown when writing to an already-ended stream.
  */
 export class WriteAfterEndError extends BaseError {
@@ -186,7 +266,7 @@ interface WriteItem<T> {
  * Object stream with seamless support for backpressure, ending and error
  * handling.
  */
-export class Stream<T> implements Readable<T>, Writable<T> {
+export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	/**
 	 * Writers waiting for `_reader` to retrieve and process their value.
 	 */
@@ -399,7 +479,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	 *               must produce a new value (or promise for a value).
 	 * @return New stream with mapped values.
 	 */
-	map<R>(mapper: (value: T) => R|Thenable<R>): Stream<R> {
+	map<R>(mapper: (value: T) => R|Thenable<R>): ReadableStream<R> {
 		let output = new Stream<R>();
 		map(this, output, mapper);
 		return output;
@@ -419,7 +499,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	 *                 (promise for) a truthy value.
 	 * @return New stream with filtered values.
 	 */
-	filter(filterer: (value: T) => boolean|Thenable<boolean>): Stream<T> {
+	filter(filterer: (value: T) => boolean|Thenable<boolean>): ReadableStream<T> {
 		let output = new Stream<T>();
 		filter(this, output, filterer);
 		return output;
@@ -441,7 +521,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	}
 
 	// TODO Experimental
-	transform<R>(transformer: Transform<T, R>): Stream<R> {
+	transform<R>(transformer: Transform<T, R>): ReadableStream<R> {
 		let output = new Stream<R>();
 		transformer(this, output);
 		return output;
@@ -466,7 +546,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 
 	// TODO Experimental
 	// TODO Not sure whether a 'reverse' function confuses more than it helps
-	mappedBy<X>(mapper: (value: X) => T|Thenable<T>): Writable<X> {
+	mappedBy<X>(mapper: (value: X) => T|Thenable<T>): WritableStream<X> {
 		let input = new Stream<X>();
 		map(input, this, mapper);
 		return input;
@@ -474,7 +554,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 
 	// TODO Experimental
 	// TODO Not sure whether a 'reverse' function confuses more than it helps
-	filterBy(filterer: (value: T) => boolean|Thenable<boolean>): Writable<T> {
+	filterBy(filterer: (value: T) => boolean|Thenable<boolean>): WritableStream<T> {
 		let input = new Stream<T>();
 		filter(input, this, filterer);
 		return input;
@@ -489,7 +569,7 @@ export class Stream<T> implements Readable<T>, Writable<T> {
 	 * @param data Input array
 	 * @return Stream for all values in the input array
 	 */
-	static from<T>(data: T[]): Stream<T> {
+	static from<T>(data: T[]): ReadableStream<T> {
 		// TODO: consider rewriting to use .forEach()
 		let stream = new Stream<T>();
 		let i = 0;
