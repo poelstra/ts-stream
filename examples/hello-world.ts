@@ -8,7 +8,7 @@
 
 /// <reference path="../typings/tsd.d.ts" />
 
-import Stream from "../index";
+import Stream from "../lib/index";
 
 Stream.from([1,2,3,4])
 	.map((n) => n * 2)

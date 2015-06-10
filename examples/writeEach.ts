@@ -9,7 +9,7 @@
 /// <reference path="../typings/tsd.d.ts" />
 
 import Promise from "ts-promise";
-import Stream from "../index";
+import Stream from "../lib/index";
 
 // Create a source that produces numbers 0, 1, 2, 3
 var i = 0;

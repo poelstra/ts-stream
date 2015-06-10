@@ -9,7 +9,7 @@
 /// <reference path="../typings/tsd.d.ts" />
 
 import Promise from "ts-promise";
-import Stream from "../index";
+import Stream from "../lib/index";
 
 var source = new Stream<number>();
 source.write(0).then(() => console.log("write 0 ok"), (err) => console.log("write 0 error", err));

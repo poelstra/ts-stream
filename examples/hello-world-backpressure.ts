@@ -9,7 +9,7 @@
 /// <reference path="../typings/tsd.d.ts" />
 
 import Promise from "ts-promise";
-import Stream from "../index";
+import Stream from "../lib/index";
 
 Stream.from([1,2,3,4])
 	.map((n) => Promise.resolve(n * 2).delay(1000))
