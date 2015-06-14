@@ -294,6 +294,12 @@ items will be added to this list though...):
 
 # Changelog
 
+0.4.0 (2015-06-14):
+- Writing a rejected Thenable no longer ends stream, but makes that write fail
+  (see #5, thanks Rogier!)
+- Publish .ts files in npm (#4)
+- Add .isEnded() (#3)
+
 0.3.0 (2015-06-10):
 - Introduce ReadableStream and WritableStream interfaces
 - .map() etc no longer return Stream but e.g. ReadableStream
