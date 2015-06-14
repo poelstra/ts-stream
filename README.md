@@ -16,22 +16,6 @@ Features:
 - Long stack trace support for errors thrown downstream (i.e. know which
   transform threw an error, and where that value came from)
 
-Notes:
-- Only one 'reader' can be attached to a stream: an explicit 'splitter' is
-  needed to stream to multiple destinations. This is considered a feature,
-  as different choices can be made for when to start streaming, how to handle
-  backpressure and errors.
-- Reading is not done through an iterator interface, as that doesn't allow
-  feedback on EOF, nor does it e.g. automatically handle errors during map.
-  If such behavior is needed, it is fairly easy to convert from `forEach()` to
-  an iterator.
-- There is 'asymmetry' between e.g. `write()` and `forEach()` (i.e. there's no
-  `read()` that reads a single value). Main reason is that there needs to be a
-  single call to an end/error handler (because errors returned by it must
-  somehow be handled, in this case by the corresponding `write()`/`end()` call),
-  and having the read and end handlers in different calls lead to an awkward
-  interface.
-
 # Usage and examples
 
 Examples are given in ES6 notation for brevity (e.g. `(n) => n * 2` instead of
@@ -52,7 +36,7 @@ npm install --save ts-stream
 ```
 
 Then, include the library using:
-```js
+```ts
 import Stream from "ts-stream"; // ES6 style
 // or
 var Stream = require("ts-stream").Stream; // CommonJS style
@@ -114,7 +98,26 @@ Stream.from([1,2,3,4])
 ## Writing to a stream
 
 We've used the `from()` helper to create a stream from an array. Let's create
-our own stream instead:
+our own stream instead.
+
+To illustrate the principle, writing to a stream is as simple as:
+```ts
+var source = new Stream<number>();
+source.write(1);
+source.write(2);
+source.end();
+
+source.forEach((n) => console.log(n));
+// 1, 2
+```
+
+## Writing to stream with error handling and backpressure
+
+The previous example did not have any error handling, and wrote all values to
+the stream at once.
+
+Because `write()` returns a promise, it's very easy to handle backpressure,
+and catch any errors:
 
 ```ts
 var source = new Stream<number>();
@@ -124,7 +127,13 @@ p = p.then(() => { console.log("write", i); return source.write(i++); });
 p = p.then(() => { console.log("write", i); return source.write(i++); });
 p = p.then(() => { console.log("write", i); return source.write(i++); });
 p = p.then(() => { console.log("write end"); return source.end(); });
-p.done(() => console.log("write done"), (err) => console.log("write failed", err));
+p.done(
+    () => console.log("write done"),
+    (err) => {
+        console.log("write failed", err);
+        source.abort(err);
+    }
+);
 
 source.forEach((n) => console.log("read", n), (err) => console.log("read end", err || "ok"));
 ```
@@ -150,12 +159,13 @@ forEach callbacks and see how the writes are delayed too).
 
 Errors generated in `forEach()`'s read handler are 'returned' to the corresponding
 `write()` or `end()` call.
-Errors from the write-side (i.e. passing an error to `end()` or writing a
-rejected promise) causes the stream to end, and the end handler of `forEach()`
-to be called with that error.
+To signal an error from the write-side to the forEach-side, you can `end()` the
+stream with an error, causing the end handler of `forEach()` to be called with
+that error.
 
-For example, in a mapping transform, if the map callback throws an error, this
-error is 'reflected' back to the write that caused that callback to be called.
+For example, in a mapping transform, if the map callback throws an error (or
+returns a rejected promise), this error is 'reflected' back to the write that
+caused that callback to be called.
 This allows the writer to decide to simply write another value, end the stream,
 etc.
 
@@ -190,13 +200,7 @@ read end ok
 write end ok
 ```
 
-Conversely, an error produced on the sending side is received by the reader,
-but it can decide to 'swallow' that error and thus let the `end()` call itself
-succeed.
-
-In the following example, note how `map()` simply passes the error on to its
-destination:
-
+When ending a stream with an error, the error will 'flow' through e.g. `map()`:
 ```ts
 var source = new Stream<number>();
 source.write(0).then(() => console.log("write 0 ok"), (err) => console.log("write 0 error", err));
@@ -221,6 +225,23 @@ write 2 ok
 read end [Error: oops]
 write end ok
 ```
+
+# Notes
+
+- Only one 'reader' can be attached to a stream: an explicit 'splitter' is
+  needed to stream to multiple destinations. This is considered a feature,
+  as different choices can be made for when to start streaming, how to handle
+  backpressure and errors.
+- Reading is not done through an iterator interface, as that doesn't allow
+  feedback on EOF, nor does it e.g. automatically handle errors during map.
+  If such behavior is needed, it is fairly easy to convert from `forEach()` to
+  an iterator.
+- There is 'asymmetry' between e.g. `write()` and `forEach()` (i.e. there's no
+  `read()` that reads a single value). Main reason is that there needs to be a
+  single call to an end/error handler (because errors returned by it must
+  somehow be handled, in this case by the corresponding `write()`/`end()` call),
+  and having the read and end handlers in different calls lead to an awkward
+  interface.
 
 # Status
 
