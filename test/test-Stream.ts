@@ -11,12 +11,12 @@
 require("source-map-support").install();
 
 import Promise from "ts-promise";
-import { Stream, WriteAfterEndError } from "../lib/index";
+import { Stream, ReadableStream, WriteAfterEndError } from "../lib/index";
 import { expect } from "chai";
 
 //Promise.setLongTraces(true);
 
-function readInto<T>(stream: Stream<T>, into: T[]): Promise<void> {
+function readInto<T>(stream: ReadableStream<T>, into: T[]): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
 		stream.forEach(
 			function(value: T) {
@@ -108,21 +108,34 @@ describe("Stream", () => {
 		expect(results).to.deep.equal([]);
 	});
 
-	it("disallows write or end when previously written value resolved to EOF");
-
-	it("handles write of asynchronously rejected promise", () => {
-		var d = Promise.defer<number>();
-		var wp = s.write(d.promise);
-		var ep = s.end();
-		// first read should eventually directly lead to the error, after which
-		// the stream should be closed with that error
-		var rp = readInto(s, results);
+	it("write fails when writing synchronously rejected promise", () => {
 		var e = new Error("boom");
+		var wp1 = s.write(Promise.reject(e));
+		var wp2 = s.write(42);
+		var ep = s.end();
+		var rp = readInto(s, results);
+		Promise.flush();
+		expect(wp1.reason()).to.equal(e);
+		expect(wp2.isFulfilled()).to.equal(true);
+		expect(results).to.deep.equal([42]);
+		expect(ep.isFulfilled()).to.equal(true);
+		expect(rp.isFulfilled()).to.equal(true);
+	});
+
+	it("write fails when writing asynchronously rejected promise", () => {
+		var e = new Error("boom");
+		var d = Promise.defer<number>();
+		var wp1 = s.write(d.promise);
+		var wp2 = s.write(42);
+		var ep = s.end();
+		var rp = readInto(s, results);
 		d.reject(e);
 		Promise.flush();
-		expect(wp.isFulfilled()).to.equal(true);
-		expect(ep.reason()).to.be.instanceof(WriteAfterEndError);
-		expect(rp.reason()).to.equal(e);
+		expect(wp1.reason()).to.equal(e);
+		expect(wp2.isFulfilled()).to.equal(true);
+		expect(results).to.deep.equal([42]);
+		expect(ep.isFulfilled()).to.equal(true);
+		expect(rp.isFulfilled()).to.equal(true);
 	});
 
 	it("resolves reads in-order for out-of-order writes", () => {
@@ -243,8 +256,6 @@ describe("Stream", () => {
 		expect(writeError).to.equal(abortError);
 		expect(readError).to.equal(abortError);
 	});
-
-	it("handles errors of written Thenables and readers/enders after abort");
 
 	describe("forEach()", () => {
 		it("handles empty stream", () => {
