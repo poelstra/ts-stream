@@ -138,6 +138,13 @@ export interface ReadableStream<T> extends Readable<T> {
 	ended(): Promise<void>;
 
 	/**
+	 * Determine whether stream has completely ended (i.e. end handler has been
+	 * called and its return Thenable, if any, is resolved).
+	 * @return true when stream has ended, false otherwise
+	 */
+	isEnded(): boolean;
+
+	/**
 	 * Run all input values through a mapping callback, which must produce a new
 	 * value (or promise for a value), similar to e.g. `Array`'s `map()`.
 	 *
@@ -191,6 +198,13 @@ export interface WritableStream<T> extends Writable<T> {
 	 * @return Promise resolved with the result of `forEach()`'s end handler
 	 */
 	ended(): Promise<void>;
+
+	/**
+	 * Determine whether stream has completely ended (i.e. end handler has been
+	 * called and its return Thenable, if any, is resolved).
+	 * @return true when stream has ended, false otherwise
+	 */
+	isEnded(): boolean;
 
 	// TODO Experimental
 	writeEach(writer: () => T|Thenable<T>|void|Thenable<void>): Promise<void>;
@@ -470,6 +484,15 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 */
 	ended(): Promise<void> {
 		return this._endDeferred.promise;
+	}
+
+	/**
+	 * Determine whether stream has completely ended (i.e. end handler has been
+	 * called and its return Thenable, if any, is resolved).
+	 * @return true when stream has ended, false otherwise
+	 */
+	isEnded(): boolean {
+		return !!this._ended;
 	}
 
 	/**

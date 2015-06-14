@@ -310,6 +310,23 @@ describe("Stream", () => {
 		});
 	}); // forEach()
 
+	describe("isEnded()", () => {
+		it("indicates stream end", () => {
+			s.end();
+			Promise.flush();
+			expect(s.isEnded()).to.equal(false);
+
+			var d = Promise.defer();
+			s.forEach(noop, (e) => d.promise);
+			Promise.flush();
+			expect(s.isEnded()).to.equal(false);
+
+			d.resolve();
+			Promise.flush();
+			expect(s.isEnded()).to.equal(true);
+		});
+	});
+
 	describe("map()", () => {
 		it("maps values", () => {
 			var mapped = s.map((n) => n * 2);
