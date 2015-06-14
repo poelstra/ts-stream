@@ -11,5 +11,3 @@
 /.travis.yml
 
 tsconfig.json
-*.ts
-!*.d.ts
