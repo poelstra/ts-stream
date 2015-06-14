@@ -309,4 +309,53 @@ describe("Stream", () => {
 			expect(() => s.forEach(noop)).to.throw();
 		});
 	}); // forEach()
+
+	describe("map()", () => {
+		it("maps values", () => {
+			var mapped = s.map((n) => n * 2);
+			var writes = [s.write(1), s.write(2), s.end()];
+			readInto(mapped, results);
+			Promise.flush();
+			expect(results).to.deep.equal([2, 4]);
+			expect(writes[0].isFulfilled()).to.equal(true);
+			expect(writes[1].isFulfilled()).to.equal(true);
+			expect(writes[2].isFulfilled()).to.equal(true);
+		});
+
+		it("bounces thrown error", () => {
+			var e = new Error("boom");
+			var mapped = s.map((n) => {
+				if (n === 1) {
+					throw e;
+				} else {
+					return n * 2;
+				}
+			});
+			var writes = [s.write(1), s.write(2), s.end()];
+			readInto(mapped, results);
+			Promise.flush();
+			expect(results).to.deep.equal([4]);
+			expect(writes[0].reason()).to.equal(e);
+			expect(writes[1].isFulfilled()).to.equal(true);
+			expect(writes[2].isFulfilled()).to.equal(true);
+		});
+
+		it("bounces returned rejection", () => {
+			var e = new Error("boom");
+			var mapped = s.map((n) => {
+				if (n === 1) {
+					return Promise.reject(e);
+				} else {
+					return n * 2;
+				}
+			});
+			var writes = [s.write(1), s.write(2), s.end()];
+			readInto(mapped, results);
+			Promise.flush();
+			expect(results).to.deep.equal([4]);
+			expect(writes[0].reason()).to.equal(e);
+			expect(writes[1].isFulfilled()).to.equal(true);
+			expect(writes[2].isFulfilled()).to.equal(true);
+		});
+	});
 });
