@@ -346,6 +346,43 @@ describe("Stream", () => {
 		});
 	});
 
+	describe("ended()", () => {
+		it("indicates stream end", () => {
+			s.end();
+			Promise.flush();
+			expect(s.ended().isPending()).to.equal(true);
+
+			var d = Promise.defer();
+			s.forEach(noop, (e) => d.promise);
+			Promise.flush();
+			expect(s.ended().isPending()).to.equal(true);
+
+			d.resolve();
+			Promise.flush();
+			expect(s.ended().value()).to.equal(undefined);
+		});
+
+		it("can be overridden by `end()`", () => {
+			let endResult = Promise.defer();
+			s.end(null, endResult.promise);
+			Promise.flush();
+			expect(s.ended().isPending()).to.equal(true);
+
+			var d = Promise.defer();
+			s.forEach(noop, (e) => d.promise);
+			Promise.flush();
+			expect(s.ended().isPending()).to.equal(true);
+
+			d.resolve();
+			Promise.flush();
+			expect(s.ended().isPending()).to.equal(true);
+
+			endResult.resolve();
+			Promise.flush();
+			expect(s.ended().value()).to.equal(undefined);
+		});
+	});
+
 	describe("map()", () => {
 		it("maps values", () => {
 			var mapped = s.map((n) => n * 2);
