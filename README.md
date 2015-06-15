@@ -294,6 +294,10 @@ items will be added to this list though...):
 
 # Changelog
 
+0.4.1 (2015-06-15):
+- Allow `null` for `end()` (#10)
+- Allow `ended()` to wait for upstream stream(s) (#7)
+
 0.4.0 (2015-06-14):
 - Writing a rejected Thenable no longer ends stream, but makes that write fail
   (see #5, thanks Rogier!)
