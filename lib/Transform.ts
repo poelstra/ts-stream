@@ -28,7 +28,7 @@ export function map<T,R>(readable: Readable<T>, writable: Writable<R>, mapper: (
 		(v: T): Promise<void> => {
 			return writable.write(mapper(v));
 		},
-		(error?: Error) => writable.end(error)
+		(error?: Error) => writable.end(error, readable.ended())
 	);
 }
 
@@ -48,7 +48,7 @@ export function filter<T>(readable: Readable<T>, writable: Writable<T>, filterer
 				});
 			}
 		},
-		(error?: Error) => writable.end(error)
+		(error?: Error) => writable.end(error, readable.ended())
 	);
 }
 

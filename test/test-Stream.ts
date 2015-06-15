@@ -430,5 +430,33 @@ describe("Stream", () => {
 			expect(writes[1].isFulfilled()).to.equal(true);
 			expect(writes[2].isFulfilled()).to.equal(true);
 		});
+
+		it("waits for source stream to end", () => {
+			let d = Promise.defer();
+			var slowEndingSource = s.transform<number>((readable, writable) => {
+				readable.forEach(
+					(v) => writable.write(v),
+					(error?: Error) => {
+						writable.end(error, readable.ended());
+						return d.promise;
+					}
+				);
+			});
+			var writes = [s.write(1), s.write(2), s.end()];
+
+			var mapped = slowEndingSource.map((n) => n * 2);
+			readInto(mapped, results);
+
+			Promise.flush();
+			expect(results).to.deep.equal([2, 4]);
+			expect(writes[0].isFulfilled()).to.equal(true);
+			expect(writes[1].isFulfilled()).to.equal(true);
+			expect(writes[2].isFulfilled()).to.equal(false);
+			expect(mapped.ended().isFulfilled()).to.equal(false);
+
+			d.resolve();
+			Promise.flush();
+			expect(mapped.ended().isFulfilled()).to.equal(true);
+		});
 	});
 });
