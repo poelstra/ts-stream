@@ -310,6 +310,25 @@ describe("Stream", () => {
 		});
 	}); // forEach()
 
+	describe("end()", () => {
+		it("allows null as error parameter", () => {
+			readInto(s, results);
+			return s.end(null);
+		});
+		it("allows undefined as error parameter", () => {
+			readInto(s, results);
+			return s.end(undefined);
+		});
+		it("allows an Error as error parameter", () => {
+			readInto(s, results);
+			return s.end(new Error("boom"));
+		});
+		it("disallows non-error as error parameter", () => {
+			readInto(s, results);
+			expect(() => s.end(<any>"boom")).to.throw("invalid argument");
+		});
+	});
+
 	describe("isEnded()", () => {
 		it("indicates stream end", () => {
 			s.end();

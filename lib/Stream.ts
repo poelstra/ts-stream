@@ -393,10 +393,9 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *         end-of-stream
 	 */
 	end(error?: Error): Promise<void> {
-		assert(
-			error === undefined || error instanceof Error,
-			"invalid argument to end(): must be undefined or Error object"
-		);
+		if (!(error === undefined || error === null || error instanceof Error)) {
+			throw new TypeError("invalid argument to end(): must be undefined, null or Error object");
+		}
 		let valuePromise = Promise.resolve(new Eof(error));
 		let writeDone = Promise.defer();
 		this._writers.push({
