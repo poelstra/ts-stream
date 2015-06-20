@@ -423,42 +423,42 @@ describe("Stream", () => {
 		});
 	}); // isEnded()
 
-	describe("ended()", () => {
+	describe("result()", () => {
 		it("indicates stream end", () => {
 			s.end();
 			Promise.flush();
-			expect(s.ended().isPending()).to.equal(true);
+			expect(s.result().isPending()).to.equal(true);
 
 			var d = Promise.defer();
 			s.forEach(noop, (e) => d.promise);
 			Promise.flush();
-			expect(s.ended().isPending()).to.equal(true);
+			expect(s.result().isPending()).to.equal(true);
 
 			d.resolve();
 			Promise.flush();
-			expect(s.ended().value()).to.equal(undefined);
+			expect(s.result().value()).to.equal(undefined);
 		});
 
 		it("can be overridden by `end()`", () => {
 			let endResult = Promise.defer();
 			s.end(null, endResult.promise);
 			Promise.flush();
-			expect(s.ended().isPending()).to.equal(true);
+			expect(s.result().isPending()).to.equal(true);
 
 			var d = Promise.defer();
 			s.forEach(noop, (e) => d.promise);
 			Promise.flush();
-			expect(s.ended().isPending()).to.equal(true);
+			expect(s.result().isPending()).to.equal(true);
 
 			d.resolve();
 			Promise.flush();
-			expect(s.ended().isPending()).to.equal(true);
+			expect(s.result().isPending()).to.equal(true);
 
 			endResult.resolve();
 			Promise.flush();
-			expect(s.ended().value()).to.equal(undefined);
+			expect(s.result().value()).to.equal(undefined);
 		});
-	}); // ended()
+	}); // result()
 
 	describe("map()", () => {
 		it("maps values", () => {
@@ -512,7 +512,7 @@ describe("Stream", () => {
 				readable.forEach(
 					(v) => writable.write(v),
 					(error?: Error) => {
-						writable.end(error, readable.ended());
+						writable.end(error, readable.result());
 						return d.promise;
 					}
 				);
@@ -527,11 +527,11 @@ describe("Stream", () => {
 			expect(writes[0].isFulfilled()).to.equal(true);
 			expect(writes[1].isFulfilled()).to.equal(true);
 			expect(writes[2].isFulfilled()).to.equal(false);
-			expect(mapped.ended().isFulfilled()).to.equal(false);
+			expect(mapped.result().isFulfilled()).to.equal(false);
 
 			d.resolve();
 			Promise.flush();
-			expect(mapped.ended().isFulfilled()).to.equal(true);
+			expect(mapped.result().isFulfilled()).to.equal(true);
 		});
 	}); // map()
 });

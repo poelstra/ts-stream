@@ -72,13 +72,14 @@ export interface Readable<T> {
 	abort(reason: Error): void;
 
 	/**
-	 * Obtain a promise that resolves when the stream has completely ended, i.e.
-	 * `end()` has been called (possibly with an Error), the end handler has
-	 * run and its returned promise resolved or rejected, and optionally the
-	 * result parameter to `end()` has been resolved.
+	 * Obtain a promise that resolves when the stream has completely ended:
+	 * - `end()` has been called (possibly with an Error),
+	 * - `ender` callback has run and its returned promise resolved,
+	 * - `end()`'s result parameter (if any) has been resolved.
+	 *
 	 * @return Promise resolved when stream has completely ended
 	 */
-	ended(): Promise<void>;
+	result(): Promise<void>;
 }
 
 /**
@@ -119,16 +120,16 @@ export interface Writable<T> {
 	 * All calls to `write()` or `end()` after the first `end()` will be
 	 * rejected with a `WriteAfterEndError`.
 	 *
-	 * It is possible to let this stream's `ended()` result 'wait' for any
+	 * It is possible to let this stream's `result()` result 'wait' for any
 	 * upstream's `end()` call(s) to be finished by passing e.g. our direct
-	 * upstream's `ended()` promise as the second argument.
+	 * upstream's `result()` promise as the second argument.
 	 *
 	 * @param  error Optional Error to pass to `forEach()` end handler
-	 * @param  endedResult Optional promise that determines final value of `ended()`
+	 * @param  result Optional promise that determines final value of `result()`
 	 * @return Void-promise that resolves when end-handler has processed the
 	 *         end-of-stream
 	 */
-	end(error?: Error, endedResult?: Thenable<void>): Promise<void>;
+	end(error?: Error, result?: Thenable<void>): Promise<void>;
 }
 
 /**
@@ -191,13 +192,14 @@ export interface ReadableStream<T> extends Readable<T> {
  */
 export interface WritableStream<T> extends Writable<T> {
 	/**
-	 * Obtain a promise that resolves when the stream has completely ended, i.e.
-	 * `end()` has been called (possibly with an Error), the end handler has
-	 * run and its returned promise resolved or rejected, and optionally the
-	 * result parameter to `end()` has been resolved.
+	 * Obtain a promise that resolves when the stream has completely ended:
+	 * - `end()` has been called (possibly with an Error),
+	 * - `ender` callback has run and its returned promise resolved,
+	 * - `end()`'s result parameter (if any) has been resolved.
+	 *
 	 * @return Promise resolved when stream has completely ended
 	 */
-	ended(): Promise<void>;
+	result(): Promise<void>;
 
 	/**
 	 * Determine whether stream has completely ended (i.e. end handler has been
@@ -260,9 +262,9 @@ class Eof {
 	/**
 	 * Create new end-of-stream value, optionally signalling an error.
 	 * @param error     Optional Error value
-	 * @param endResult Optional final result value of `ended()`
+	 * @param result Optional final result value of `result()`
 	 */
-	constructor(public error?: Error, public endResult?: Thenable<void>) {
+	constructor(public error?: Error, public result?: Thenable<void>) {
 	}
 }
 
@@ -333,9 +335,10 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	private _abortPromise: Promise<void>;
 
 	/**
-	 * Resolved to the result of calling `_ender`.
+	 * Resolved to the result of calling `_ender`, then the `result` property of
+	 * the end-of-stream value.
 	 */
-	private _endDeferred = Promise.defer();
+	private _resultDeferred = Promise.defer();
 
 	/**
 	 * Write value (or promise for value) to stream.
@@ -389,12 +392,12 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * All calls to `write()` or `end()` after the first `end()` will be
 	 * rejected with a `WriteAfterEndError`.
 	 *
-	 * It is possible to let this stream's `ended()` result 'wait' for any
+	 * It is possible to let this stream's `result()` result 'wait' for any
 	 * upstream's `end()` call(s) to be finished by passing e.g. our direct
-	 * upstream's `ended()` promise as the second argument.
+	 * upstream's `result()` promise as the second argument.
 	 *
 	 * @param  error Optional Error to pass to `forEach()` end handler
-	 * @param  endedResult Optional promise that determines final value of `ended()`
+	 * @param  endedResult Optional promise that determines final value of `result()`
 	 * @return Void-promise that resolves when end-handler has processed the
 	 *         end-of-stream
 	 */
@@ -483,14 +486,15 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	}
 
 	/**
-	 * Obtain a promise that resolves when the stream has completely ended, i.e.
-	 * `end()` has been called (possibly with an Error), the end handler has
-	 * run and its returned promise resolved or rejected, and optionally the
-	 * result parameter to `end()` has been resolved.
+	 * Obtain a promise that resolves when the stream has completely ended:
+	 * - `end()` has been called (possibly with an Error),
+	 * - `ender` callback has run and its returned promise resolved,
+	 * - `end()`'s result parameter (if any) has been resolved.
+	 *
 	 * @return Promise resolved when stream has completely ended
 	 */
-	ended(): Promise<void> {
-		return this._endDeferred.promise;
+	result(): Promise<void> {
+		return this._resultDeferred.promise;
 	}
 
 	/**
@@ -613,7 +617,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 				// - Explode?
 				// - maybe only have `static into<T>(writable, data): Promise<void>`?
 				// - allow passing an end-callback?
-				// - expect people to listen for ended()?
+				// - expect people to listen for result()?
 				stream.abort(error);
 			}
 		};
@@ -649,11 +653,11 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			// corresponding write() or end() call
 			this._writers.shift().resolveWrite(this._readBusy);
 			if (this._ending) {
-				let endResult = this._ending.endResult;
+				let result = this._ending.result;
 				this._ended = this._ending.error || eof;
 				this._ending = undefined;
-				let p = endResult ? this._readBusy.then(() => endResult) : this._readBusy;
-				this._endDeferred.resolve(p);
+				let p = result ? this._readBusy.then(() => result) : this._readBusy;
+				this._resultDeferred.resolve(p);
 			}
 			this._readBusy = undefined;
 		}
