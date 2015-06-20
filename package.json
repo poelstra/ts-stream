@@ -4,9 +4,9 @@
   "description": "Type-safe object streams with seamless support for backpressure, ending, and error handling",
   "main": "lib/index.js",
   "scripts": {
-    "test": "mocha test/test-*.js",
-    "cover": "istanbul cover _mocha -- test/test-*.js",
-    "prepublish": "npm run build && npm run test",
+    "test": "npm run build && mocha test/test-*.js",
+    "cover": "npm run build && istanbul cover _mocha -- test/test-*.js",
+    "prepublish": "npm run test",
     "build": "tsc -p lib/ && tsc -p test/ && tsc -p examples && dts-generator --name ts-stream --baseDir lib --out ts-stream.d.ts lib/index.ts --main ts-stream/index --es6 --es6default --extern ./node_modules/ts-promise/dist/ts-promise.d.ts"
   },
   "repository": {
