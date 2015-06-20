@@ -294,6 +294,14 @@ items will be added to this list though...):
 
 # Changelog
 
+0.5.0 (2015-06-20):
+- Change abort() behavior (#6)
+  - allows current read callback to finish first and doesn't call ender
+  - rejects further pending and future writes
+  - writer always needs to `end()` explicitly, after which ender callback is
+    called with abort error
+- Rename ended() to result()
+
 0.4.1 (2015-06-15):
 - Allow `null` for `end()` (#10)
 - Allow `ended()` to wait for upstream stream(s) (#7)
