@@ -39,11 +39,13 @@ function noop(): void {
 
 describe("Stream", () => {
 	var s: Stream<number>;
+	var boomError: Error;
 	var results: number[];
 	var promises: Promise<any>[];
 
 	beforeEach(() => {
 		s = new Stream<number>();
+		boomError = new Error("boom");
 		results = [];
 		promises = [];
 	});
@@ -109,13 +111,12 @@ describe("Stream", () => {
 	});
 
 	it("write fails when writing synchronously rejected promise", () => {
-		var e = new Error("boom");
-		var wp1 = s.write(Promise.reject(e));
+		var wp1 = s.write(Promise.reject(boomError));
 		var wp2 = s.write(42);
 		var ep = s.end();
 		var rp = readInto(s, results);
 		Promise.flush();
-		expect(wp1.reason()).to.equal(e);
+		expect(wp1.reason()).to.equal(boomError);
 		expect(wp2.isFulfilled()).to.equal(true);
 		expect(results).to.deep.equal([42]);
 		expect(ep.isFulfilled()).to.equal(true);
@@ -123,15 +124,14 @@ describe("Stream", () => {
 	});
 
 	it("write fails when writing asynchronously rejected promise", () => {
-		var e = new Error("boom");
 		var d = Promise.defer<number>();
 		var wp1 = s.write(d.promise);
 		var wp2 = s.write(42);
 		var ep = s.end();
 		var rp = readInto(s, results);
-		d.reject(e);
+		d.reject(boomError);
 		Promise.flush();
-		expect(wp1.reason()).to.equal(e);
+		expect(wp1.reason()).to.equal(boomError);
 		expect(wp2.isFulfilled()).to.equal(true);
 		expect(results).to.deep.equal([42]);
 		expect(ep.isFulfilled()).to.equal(true);
@@ -152,110 +152,129 @@ describe("Stream", () => {
 		});
 	});
 
-	it("aborts pending writes", () => {
-		var e = new Error("boom");
-		promises.push(s.write(42).catch((r) => {
-			expect(r).to.equal(e);
-		}));
-		s.abort(e);
-		return Promise.all<void>(promises);
-	});
-	it("aborts pending ends", () => {
-		var e = new Error("boom");
-		promises.push(s.end().catch((r) => {
-			expect(r).to.equal(e);
-		}));
-		s.abort(e);
-		return Promise.all<void>(promises);
-	});
-	it("aborts pending reads", () => {
-		var e = new Error("boom");
-		promises.push(readInto(s, results).catch((r) => {
-			expect(r).to.equal(e);
-		}));
-		s.abort(e);
-		return Promise.all<void>(promises);
-	});
-	it("aborts future writes", () => {
-		var e = new Error("boom");
-		s.abort(e);
-		promises.push(s.write(42).catch((r) => {
-			expect(r).to.equal(e);
-		}));
-		return Promise.all<void>(promises);
-	});
-	it("aborts future ends", () => {
-		var e = new Error("boom");
-		s.abort(e);
-		promises.push(s.end().catch((r) => {
-			expect(r).to.equal(e);
-		}));
-		return Promise.all<void>(promises);
-	});
-	it("aborts future reads", () => {
-		var e = new Error("boom");
-		s.abort(e);
-		promises.push(readInto(s, results).catch((r) => {
-			expect(r).to.equal(e);
-		}));
-		return Promise.all<void>(promises);
-	});
+	describe("abort()", () => {
+		let abortError: Error;
+		beforeEach(() => {
+			abortError = new Error("abort error");
+		});
+		it("aborts pending writes when not being processed", () => {
+			let w1 = s.write(1);
+			let w2 = s.write(2);
+			s.abort(abortError);
+			Promise.flush();
+			expect(w1.reason()).to.equal(abortError);
+			expect(w2.reason()).to.equal(abortError);
+		});
+		it("aborts future writes when not being processed", () => {
+			s.abort(abortError);
+			let w1 = s.write(1);
+			let w2 = s.write(2);
+			Promise.flush();
+			expect(w1.reason()).to.equal(abortError);
+			expect(w2.reason()).to.equal(abortError);
+		});
+		it("waits for reader to finish, then aborts writes until end", () => {
+			let endDef = Promise.defer();
+			let r1 = Promise.defer();
+			let reads = [r1.promise];
+			let endResult: Error = null;
 
-	it("handles error thrown in reader", () => {
-		// Error thrown in reader should ONLY reflect back to writer, not to reader
-		// Allows writer to decide to send another value, abort, end normally, etc.
-		var writeError: Error;
-		var readError: Error;
-		s.write(1).catch((e) => { writeError = e; });
-		s.forEach((v) => { throw new Error("boom"); }, (e) => { readError = e; });
-		Promise.flush();
-		expect(writeError).to.be.instanceof(Error);
-		expect(writeError.message).to.equal("boom");
-		expect(readError).to.be.undefined;
+			let w1 = s.write(1);
+			let w2 = s.write(2);
+			s.forEach(
+				(v) => {
+					results.push(v);
+					return reads.shift();
+				},
+				(err) => {
+					endResult = err;
+					return endDef.promise;
+				}
+			);
 
-		// Try to end the stream with an error, this time it should only end up in
-		// ender (basically already covered by other tests, but just to make sure
-		// that internal state isn't corrupted)
-		writeError = undefined;
-		readError = undefined;
-		s.end(new Error("end boom")).catch((e) => { writeError = e; });
-		Promise.flush();
-		expect(writeError).to.be.undefined;
-		expect(readError).to.be.instanceof(Error);
-		expect(readError.message).to.equal("end boom");
-	});
+			Promise.flush();
+			expect(w1.isPending()).to.equal(true);
+			expect(w2.isPending()).to.equal(true);
+			expect(results).to.deep.equal([1]);
 
-	it("aborts write and calls ender if synchronously aborted in reader", () => {
-		var writeError: Error;
-		var readError: Error;
-		var abortError = new Error("abort boom");
-		s.write(1).catch((e) => { writeError = e; });
-		s.forEach(
-			(v) => { s.abort(abortError); },
-			(e) => { readError = e; }
-		);
-		Promise.flush();
-		expect(writeError).to.equal(abortError);
-		expect(readError).to.equal(abortError);
-	});
+			s.abort(abortError);
+			let w3 = s.write(3);
+			Promise.flush();
+			expect(w1.isPending()).to.equal(true);
+			expect(w2.isPending()).to.equal(true);
+			expect(w3.isPending()).to.equal(true);
+			expect(results).to.deep.equal([1]);
 
-	it("aborts write and calls ender if asynchronously aborted in reader", () => {
-		var writeError: Error;
-		var readError: Error;
-		var abortError = new Error("abort boom");
-		s.write(1).catch((e) => { writeError = e; });
-		s.forEach(
-			(v) => {
-				return Promise.resolve().then(
-					() => { s.abort(abortError); }
-				);
-			},
-			(e) => { readError = e; }
-		);
-		Promise.flush();
-		expect(writeError).to.equal(abortError);
-		expect(readError).to.equal(abortError);
-	});
+			r1.reject(boomError); // could do resolve() too, error is more interesting :)
+			Promise.flush();
+			expect(w1.reason()).to.equal(boomError);
+			expect(w2.reason()).to.equal(abortError);
+			expect(w3.reason()).to.equal(abortError);
+			expect(results).to.deep.equal([1]);
+			expect(endResult).to.equal(null);
+
+			let we = s.end(new Error("end error"));
+			Promise.flush();
+			expect(endResult).to.equal(abortError);
+			expect(we.isPending()).to.equal(true);
+
+			let enderError = new Error("ender error");
+			endDef.reject(enderError);
+			Promise.flush();
+			expect(we.reason()).to.equal(enderError);
+
+			let we2 = s.end();
+			Promise.flush();
+			expect(we2.reason()).to.be.instanceof(WriteAfterEndError);
+		});
+		it("can be called in reader", () => {
+			var endResult: Error = null;
+			let w1 = s.write(1);
+			let w2 = s.write(2);
+			let r1 = Promise.defer();
+			s.forEach(
+				(v) => { s.abort(abortError); return r1.promise; },
+				(e) => { endResult = e; }
+			);
+			Promise.flush();
+			expect(w1.isPending()).to.equal(true);
+			expect(w2.isPending()).to.equal(true);
+			expect(endResult).to.equal(null);
+
+			r1.resolve();
+			Promise.flush();
+			expect(w1.value()).to.equal(undefined);
+			expect(w2.reason()).to.equal(abortError);
+			expect(endResult).to.equal(null);
+
+			let we = s.end();
+			Promise.flush();
+			expect(endResult).to.equal(abortError);
+			expect(we.value()).to.equal(undefined);
+		});
+		it("ignores multiple aborts", () => {
+			var endResult: Error = null;
+			let w1 = s.write(1);
+			let r1 = Promise.defer();
+			let firstAbortError = new Error("first abort error");
+			s.abort(firstAbortError);
+			s.forEach(
+				(v) => { chai.assert(false); },
+				(e) => { endResult = e; }
+			);
+
+			Promise.flush();
+			expect(w1.reason()).to.equal(firstAbortError);
+			expect(endResult).to.equal(null);
+
+			s.abort(abortError);
+			r1.resolve();
+			let we = s.end();
+			Promise.flush();
+			expect(endResult).to.equal(firstAbortError);
+			expect(we.value()).to.equal(undefined);
+		});
+	}); // abort()
 
 	describe("forEach()", () => {
 		it("handles empty stream", () => {
@@ -277,7 +296,7 @@ describe("Stream", () => {
 			expect(endResult).to.equal(undefined);
 		});
 
-		it("handles a multiple values", () => {
+		it("handles multiple values", () => {
 			var endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
 			s.forEach(pushResult, (e?: Error) => { endResult = e; });
 			s.write(1);
@@ -289,26 +308,84 @@ describe("Stream", () => {
 			expect(endResult).to.equal(undefined);
 		});
 
-		it("handles errors during read and end", () => {
-			var readError = new Error("boom");
+		it("handles error in reader", () => {
 			var endError = new Error("end boom");
 			var endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
 			s.forEach((n) => {
-				throw readError;
+				throw boomError;
 			}, (e?: Error) => { endResult = e; });
+
+			// Write a value, will be rejected by reader and returned from write
 			var wp = s.write(1);
+			Promise.flush();
+			expect(endResult).to.equal(null);
+			expect(wp.reason()).to.equal(boomError);
+
+			// Then end the stream with an error, the end() itself should return
+			// void promise
 			var ep = s.end(endError);
 			Promise.flush();
 			expect(endResult).to.equal(endError);
-			expect(wp.reason()).to.equal(readError);
 			expect(ep.value()).to.equal(undefined);
 		});
 
-		it("allows a single attach", () => {
+		it("handles error thrown in reader", () => {
+			// Error thrown in reader should ONLY reflect back to writer, not to reader
+			// Allows writer to decide to send another value, abort, end normally, etc.
+			var writeError: Error;
+			var endResult: Error;
+			s.write(1).catch((e) => { writeError = e; });
+			s.forEach((v) => { throw boomError }, (e) => { endResult = e; });
+			Promise.flush();
+			expect(writeError).to.equal(boomError);
+			expect(endResult).to.be.undefined;
+
+			// Try to end the stream with an error, this time it should only end up in
+			// ender (basically already covered by other tests, but just to make sure
+			// that internal state isn't corrupted)
+			writeError = undefined;
+			endResult = undefined;
+			let endBoom = new Error("end boom");
+			s.end(endBoom).catch((e) => { writeError = e; });
+			Promise.flush();
+			expect(writeError).to.be.undefined;
+			expect(endResult).to.equal(endBoom);
+		});
+
+		it("can use a default ender", () => {
+			s.forEach(
+				(v) => { results.push(v); }
+			);
+			s.write(1);
+			s.write(2);
+			s.end();
+			Promise.flush();
+			expect(results).to.deep.equal([1, 2]);
+		});
+
+		it("returns errors by default", () => {
+			s.forEach(
+				(v) => { results.push(v); }
+			);
+			s.write(1);
+			s.write(2);
+			let we = s.end(boomError);
+			Promise.flush();
+			expect(results).to.deep.equal([1, 2]);
+			expect(we.reason()).to.equal(boomError);
+		});
+
+		it("disallows multiple attach", () => {
 			s.forEach(noop);
 			expect(() => s.forEach(noop)).to.throw();
 		});
 	}); // forEach()
+
+	describe("write()", () => {
+		it("disallows writing undefined", () => {
+			expect(() => s.write(undefined)).to.throw(TypeError, "void value");
+		});
+	}); // write()
 
 	describe("end()", () => {
 		it("allows null as error parameter", () => {
@@ -321,13 +398,13 @@ describe("Stream", () => {
 		});
 		it("allows an Error as error parameter", () => {
 			readInto(s, results);
-			return s.end(new Error("boom"));
+			return s.end(boomError);
 		});
 		it("disallows non-error as error parameter", () => {
 			readInto(s, results);
 			expect(() => s.end(<any>"boom")).to.throw("invalid argument");
 		});
-	});
+	}); // end()
 
 	describe("isEnded()", () => {
 		it("indicates stream end", () => {
@@ -344,7 +421,7 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(s.isEnded()).to.equal(true);
 		});
-	});
+	}); // isEnded()
 
 	describe("ended()", () => {
 		it("indicates stream end", () => {
@@ -381,7 +458,7 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(s.ended().value()).to.equal(undefined);
 		});
-	});
+	}); // ended()
 
 	describe("map()", () => {
 		it("maps values", () => {
@@ -396,10 +473,9 @@ describe("Stream", () => {
 		});
 
 		it("bounces thrown error", () => {
-			var e = new Error("boom");
 			var mapped = s.map((n) => {
 				if (n === 1) {
-					throw e;
+					throw boomError;
 				} else {
 					return n * 2;
 				}
@@ -408,16 +484,15 @@ describe("Stream", () => {
 			readInto(mapped, results);
 			Promise.flush();
 			expect(results).to.deep.equal([4]);
-			expect(writes[0].reason()).to.equal(e);
+			expect(writes[0].reason()).to.equal(boomError);
 			expect(writes[1].isFulfilled()).to.equal(true);
 			expect(writes[2].isFulfilled()).to.equal(true);
 		});
 
 		it("bounces returned rejection", () => {
-			var e = new Error("boom");
 			var mapped = s.map((n) => {
 				if (n === 1) {
-					return Promise.reject(e);
+					return Promise.reject(boomError);
 				} else {
 					return n * 2;
 				}
@@ -426,7 +501,7 @@ describe("Stream", () => {
 			readInto(mapped, results);
 			Promise.flush();
 			expect(results).to.deep.equal([4]);
-			expect(writes[0].reason()).to.equal(e);
+			expect(writes[0].reason()).to.equal(boomError);
 			expect(writes[1].isFulfilled()).to.equal(true);
 			expect(writes[2].isFulfilled()).to.equal(true);
 		});
@@ -458,5 +533,5 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(mapped.ended().isFulfilled()).to.equal(true);
 		});
-	});
+	}); // map()
 });
