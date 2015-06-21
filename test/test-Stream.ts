@@ -40,12 +40,14 @@ function noop(): void {
 describe("Stream", () => {
 	var s: Stream<number>;
 	var boomError: Error;
+	var abortError: Error;
 	var results: number[];
 	var promises: Promise<any>[];
 
 	beforeEach(() => {
 		s = new Stream<number>();
 		boomError = new Error("boom");
+		abortError = new Error("abort error");
 		results = [];
 		promises = [];
 	});
@@ -153,10 +155,6 @@ describe("Stream", () => {
 	});
 
 	describe("abort()", () => {
-		let abortError: Error;
-		beforeEach(() => {
-			abortError = new Error("abort error");
-		});
 		it("aborts pending writes when not being processed", () => {
 			let w1 = s.write(1);
 			let w2 = s.write(2);
@@ -327,6 +325,14 @@ describe("Stream", () => {
 			expect(abortResult).to.equal(abortError);
 		});
 	}); // abort()
+
+	describe("aborted()", () => {
+		it("is rejected when abort is called", () => {
+			expect(s.aborted().isPending()).to.equal(true);
+			s.abort(abortError);
+			expect(s.aborted().reason()).to.equal(abortError);
+		});
+	});
 
 	describe("forEach()", () => {
 		it("handles empty stream", () => {

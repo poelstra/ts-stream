@@ -145,6 +145,15 @@ export interface Writable<T> {
 	 *         end-of-stream
 	 */
 	end(error?: Error, result?: Thenable<void>): Promise<void>;
+
+	/**
+	 * Obtain promise that resolves to a rejection when `abort()` is called.
+	 *
+	 * Useful to pass abort to upstream sources.
+	 *
+	 * @return Promise that is rejected with abort error when stream is aborted
+	 */
+	aborted(): Promise<void>;
 }
 
 /**
@@ -357,6 +366,11 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	private _abortPromise: Promise<void>;
 
 	/**
+	 * Resolved to a rejection when `abort()` is called.
+	 */
+	private _abortDeferred = Promise.defer();
+
+	/**
 	 * Resolved to the result of calling `_ender`, then the `result` property of
 	 * the end-of-stream value.
 	 */
@@ -520,7 +534,19 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			return;
 		}
 		this._abortPromise = Promise.reject(reason);
+		this._abortDeferred.resolve(this._abortPromise);
 		this._pump();
+	}
+
+	/**
+	 * Obtain promise that resolves to a rejection when `abort()` is called.
+	 *
+	 * Useful to pass abort to upstream sources.
+	 *
+	 * @return Promise that is rejected with abort error when stream is aborted
+	 */
+	aborted(): Promise<void> {
+		return this._abortDeferred.promise;
 	}
 
 	/**

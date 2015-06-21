@@ -24,6 +24,7 @@ export function compose<In, Middle, Out>(t1: Transform<In, Middle>, t2: Transfor
 }
 
 export function map<T,R>(readable: Readable<T>, writable: Writable<R>, mapper: (value: T) => R|Thenable<R>): void {
+	writable.aborted().catch((err) => readable.abort(err));
 	readable.forEach(
 		(v: T): Promise<void> => {
 			return writable.write(mapper(v));
@@ -33,6 +34,7 @@ export function map<T,R>(readable: Readable<T>, writable: Writable<R>, mapper: (
 }
 
 export function filter<T>(readable: Readable<T>, writable: Writable<T>, filterer: (value: T) => boolean|Thenable<boolean>): void {
+	writable.aborted().catch((err) => readable.abort(err));
 	readable.forEach(
 		(v: T): void|Promise<void> => {
 			var b = filterer(v);
