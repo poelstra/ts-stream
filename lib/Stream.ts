@@ -35,11 +35,15 @@ export interface Readable<T> {
 	 * callback throws an error or the returned promise resolves to a rejection,
 	 * the `write()` or `end()` will be rejected with it.
 	 *
-	 * The reader and ender will always be called asynchronously (i.e. some time
-	 * after `forEach()`, `write()` or `end()` returns), and their `this`
-	 * argument will be undefined.
-	 * It is also guaranteed that the callbacks are never called again before
-	 * their previously returned promise is resolved/rejected.
+	 * All callbacks are always called asynchronously (i.e. some time
+	 * after `forEach()`, `write()`, `end()` or `abort()` returns), and their
+	 * `this` argument will be undefined.
+	 *
+	 * The reader and ender callbacks are never called again before their
+	 * previously returned promise is resolved/rejected.
+	 *
+	 * The aborter callback can be called while a reader callback's promise is
+	 * still pending.
 	 *
 	 * If no `ender` is given, a default end handler is installed that returns
 	 * any stream end errors to the writer, and otherwise directly acknowledges
@@ -47,13 +51,22 @@ export interface Readable<T> {
 	 *
 	 * It is an error to call `forEach()` multiple times.
 	 *
-	 * @param reader Callback called with every written value
-	 * @param ender  Callback called when stream ended
+	 * @param reader  Callback called with every written value
+	 * @param ender   Optional callback called when stream is ended
+	 * @param aborter Optional callback called when stream is aborted
 	 */
-	forEach(reader: (value: T) => void|Thenable<void>, ender?: (error?: Error) => void|Thenable<void>): void;
+	forEach(
+		reader: (value: T) => void|Thenable<void>,
+		ender?: (error?: Error) => void|Thenable<void>,
+		aborter?: (error: Error) => void
+	): void;
 
 	/**
 	 * Signal stream abort to writers.
+	 *
+	 * If an aborter callback is set by `forEach()`, it will (asynchronously) be
+	 * called with the abort reason to allow early termination of a pending
+	 * operation.
 	 *
 	 * If a reader is currently processing a value (i.e. a promise returned from
 	 * a read callback is not resolved yet), that operation is still allowed to
@@ -68,6 +81,8 @@ export interface Readable<T> {
 	 *
 	 * The abort is ignored if the stream's end handler has already been called,
 	 * or another abort is already pending.
+	 *
+	 * @param reason Error value to signal a reason for the abort
 	 */
 	abort(reason: Error): void;
 
@@ -302,12 +317,19 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	private _reader: (value: T) => void|Thenable<void>;
 
 	/**
-	 * End handler that is called when the stream is ended or aborted, as set by
+	 * End handler that is called when the stream is ended, as set by
 	 * `forEach()`. Note that `forEach()` installs a default handler if the user
 	 * did not supply one.
 	 * Set to 'undefined' when it has been called.
 	 */
 	private _ender: (error?: Error) => void|Thenable<void>;
+
+	/**
+	 * Abort handler that is called when the stream is aborted, as set by
+	 * `forEach()` (can be undefined).
+	 * Set to 'undefined' when it has been called.
+	 */
+	private _aborter: (error: Error) => void;
 
 	/**
 	 * When a written value is being processed by the `_reader`, this property
@@ -433,11 +455,15 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * callback throws an error or the returned promise resolves to a rejection,
 	 * the `write()` or `end()` will be rejected with it.
 	 *
-	 * The reader and ender will always be called asynchronously (i.e. some time
-	 * after `forEach()`, `write()` or `end()` returns), and their `this`
-	 * argument will be undefined.
-	 * It is also guaranteed that the callbacks are never called again before
-	 * their previously returned promise is resolved/rejected.
+	 * All callbacks are always called asynchronously (i.e. some time
+	 * after `forEach()`, `write()`, `end()` or `abort()` returns), and their
+	 * `this` argument will be undefined.
+	 *
+	 * The reader and ender callbacks are never called again before their
+	 * previously returned promise is resolved/rejected.
+	 *
+	 * The aborter callback can be called while a reader callback's promise is
+	 * still pending.
 	 *
 	 * If no `ender` is given, a default end handler is installed that returns
 	 * any stream end errors to the writer, and otherwise directly acknowledges
@@ -445,10 +471,15 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *
 	 * It is an error to call `forEach()` multiple times.
 	 *
-	 * @param reader Callback called with every written value
-	 * @param ender  Callback called when stream ended
+	 * @param reader  Callback called with every written value
+	 * @param ender   Optional callback called when stream is ended
+	 * @param aborter Optional callback called when stream is aborted
 	 */
-	forEach(reader: (value: T) => void|Thenable<void>, ender?: (error?: Error) => void|Thenable<void>): void {
+	forEach(
+		reader: (value: T) => void|Thenable<void>,
+		ender?: (error?: Error) => void|Thenable<void>,
+		aborter?: (error: Error) => void
+	): void {
 		if (this._reader) {
 			throw new Error("forEach() can only be called once per stream");
 		}
@@ -457,11 +488,16 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		}
 		this._reader = reader;
 		this._ender = ender;
+		this._aborter = aborter;
 		this._pump();
 	}
 
 	/**
 	 * Signal stream abort to writers.
+	 *
+	 * If an aborter callback is set by `forEach()`, it will (asynchronously) be
+	 * called with the abort reason to allow early termination of a pending
+	 * operation.
 	 *
 	 * If a reader is currently processing a value (i.e. a promise returned from
 	 * a read callback is not resolved yet), that operation is still allowed to
@@ -476,6 +512,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *
 	 * The abort is ignored if the stream's end handler has already been called,
 	 * or another abort is already pending.
+	 *
+	 * @param reason Error value to signal a reason for the abort
 	 */
 	abort(reason: Error): void {
 		if (this._abortPromise || this._ending || this._ended) {
@@ -641,6 +679,14 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * `write()` and `end()`.
 	 */
 	private _pump(): void {
+		// Call abort handler, if necessary
+		if (this._abortPromise && this._aborter) {
+			// Make sure to call it asynchronously, and without a 'this'
+			// TODO: can any error thrown from the aborter be handled?
+			swallowErrors(this._abortPromise.catch(this._aborter));
+			this._aborter = undefined;
+		}
+
 		// If waiting for a reader/ender, wait some more or handle it
 		if (this._readBusy) {
 			if (this._readBusy.isPending()) {

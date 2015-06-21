@@ -274,6 +274,58 @@ describe("Stream", () => {
 			expect(endResult).to.equal(firstAbortError);
 			expect(we.value()).to.equal(undefined);
 		});
+		it("asynchronously calls aborter when already reading", () => {
+			let abortResult: Error = null;
+			let w1 = s.write(1);
+			let r1 = Promise.defer();
+			s.forEach(
+				(v) => r1.promise,
+				undefined,
+				(e) => { abortResult = e; }
+			);
+			Promise.flush();
+
+			s.abort(abortError);
+			expect(abortResult).to.equal(null);
+
+			Promise.flush();
+			expect(abortResult).to.equal(abortError);
+		});
+		it("asynchronously calls aborter when not currently reading", () => {
+			let abortResult: Error = null;
+			let w1 = s.write(1);
+			s.forEach(
+				(v) => undefined,
+				undefined,
+				(e) => { abortResult = e; }
+			);
+			Promise.flush();
+
+			s.abort(abortError);
+			expect(abortResult).to.equal(null);
+
+			Promise.flush();
+			expect(abortResult).to.equal(abortError);
+		});
+		it("asynchronously calls aborter when attaching late", () => {
+			let w1 = s.write(1);
+			Promise.flush();
+			s.abort(abortError);
+
+			Promise.flush();
+			expect(w1.reason()).to.equal(abortError);
+
+			let abortResult: Error = null;
+			s.forEach(
+				(v) => undefined,
+				undefined,
+				(e) => { abortResult = e; }
+			);
+			expect(abortResult).to.equal(null);
+
+			Promise.flush();
+			expect(abortResult).to.equal(abortError);
+		});
 	}); // abort()
 
 	describe("forEach()", () => {
