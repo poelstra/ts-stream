@@ -11,7 +11,7 @@
 require("source-map-support").install();
 
 import Promise from "ts-promise";
-import { Stream, ReadableStream, WriteAfterEndError } from "../lib/index";
+import { Stream, ReadableStream, WriteAfterEndError, Transform } from "../lib/index";
 import { expect } from "chai";
 
 //Promise.setLongTraces(true);
@@ -590,6 +590,145 @@ describe("Stream", () => {
 			d.resolve();
 			Promise.flush();
 			expect(mapped.result().isFulfilled()).to.equal(true);
+		});
+
+		it("waits for destination stream to end", () => {
+			let d = Promise.defer();
+			let slowEnder: Transform<number, number> = (readable, writable) => {
+				readable.forEach(
+					(v) => writable.write(v),
+					(error?: Error) => {
+						writable.end(error, readable.result());
+						return d.promise;
+					}
+				);
+			};
+			let w1 = s.write(1);
+			let w2 = s.write(2);
+			let we = s.end();
+
+			let mapped = s.map((n) => n * 2);
+			let slowed = mapped.transform(slowEnder);
+			readInto(slowed, results);
+
+			Promise.flush();
+			expect(results).to.deep.equal([2, 4]);
+			expect(w1.isFulfilled()).to.equal(true);
+			expect(w2.isFulfilled()).to.equal(true);
+			expect(we.isFulfilled()).to.equal(false);
+			expect(mapped.result().isFulfilled()).to.equal(false);
+			expect(slowed.result().isFulfilled()).to.equal(false);
+
+			d.resolve();
+			Promise.flush();
+			expect(mapped.result().isFulfilled()).to.equal(true);
+			expect(slowed.result().isFulfilled()).to.equal(true);
+		});
+
+		it("calls ender and awaits its result", () => {
+			let d = Promise.defer();
+			let endResult: Error = null;
+			let mapped = s.map(
+				(n) => n * 2,
+				(e) => { endResult = e; return d.promise; }
+			);
+			readInto(mapped, results);
+			let w1 = s.write(1);
+			let we = s.end();
+
+			Promise.flush();
+			expect(results).to.deep.equal([2]);
+			expect(mapped.isEnded()).to.equal(false);
+			expect(endResult).to.equal(undefined);
+			expect(w1.isFulfilled()).to.equal(true);
+			expect(we.isPending()).to.equal(true);
+
+			d.resolve();
+			Promise.flush();
+			expect(we.isFulfilled()).to.equal(true);
+			expect(mapped.isEnded()).to.equal(true);
+		});
+
+		it("returns asynchronous error in ender to writer but does end stream", () => {
+			let d = Promise.defer();
+			let endResult: Error = null;
+			let mapped = s.map(
+				(n) => n * 2,
+				(e) => { endResult = e; return d.promise; }
+			);
+			let r = readInto(mapped, results);
+			let w1 = s.write(1);
+			let we = s.end();
+
+			Promise.flush();
+			expect(results).to.deep.equal([2]);
+			expect(mapped.isEnded()).to.equal(false);
+			expect(endResult).to.equal(undefined);
+			expect(w1.isFulfilled()).to.equal(true);
+			expect(we.isPending()).to.equal(true);
+
+			d.reject(boomError);
+			Promise.flush();
+			expect(we.reason()).to.equal(boomError);
+			expect(mapped.isEnded()).to.equal(true);
+			expect(s.isEnded()).to.equal(true);
+			expect(s.result().reason()).to.equal(boomError);
+			expect(r.reason()).to.equal(boomError);
+		});
+
+		it("returns synchronous error in ender to writer but does end stream", () => {
+			let endResult: Error = null;
+			let mapped = s.map(
+				(n) => n * 2,
+				(e) => { endResult = e; throw boomError; }
+			);
+			let r = readInto(mapped, results);
+			let w1 = s.write(1);
+			let we = s.end();
+
+			Promise.flush();
+			expect(results).to.deep.equal([2]);
+			expect(endResult).to.equal(undefined);
+			expect(w1.isFulfilled()).to.equal(true);
+			expect(we.reason()).to.equal(boomError);
+			expect(mapped.isEnded()).to.equal(true);
+			expect(s.isEnded()).to.equal(true);
+			expect(s.result().reason()).to.equal(boomError);
+			expect(r.reason()).to.equal(boomError);
+		});
+
+		it("leaves original end error intact", () => {
+			let endError = new Error("endError");
+			let endResult: Error = null;
+			let mapped = s.map(
+				(n) => n * 2,
+				(e) => { endResult = e; throw boomError; }
+			);
+			let r = readInto(mapped, results);
+			let w1 = s.write(1);
+			let we = s.end(endError);
+
+			Promise.flush();
+			expect(results).to.deep.equal([2]);
+			expect(endResult).to.equal(endError);
+			expect(w1.isFulfilled()).to.equal(true);
+			expect(we.reason()).to.equal(boomError);
+			expect(mapped.isEnded()).to.equal(true);
+			expect(s.isEnded()).to.equal(true);
+			expect(s.result().reason()).to.equal(boomError);
+			expect(r.reason()).to.equal(endError);
+		});
+
+		it("supports aborter", () => {
+			let abortResult: Error = null;
+			let mapped = s.map(
+				(n) => n * 2,
+				undefined,
+				(e) => abortResult = e
+			);
+			mapped.abort(abortError);
+			Promise.flush();
+			expect(abortResult).to.equal(abortError);
 		});
 	}); // map()
 });

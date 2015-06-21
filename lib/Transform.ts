@@ -23,17 +23,55 @@ export function compose<In, Middle, Out>(t1: Transform<In, Middle>, t2: Transfor
 	};
 }
 
-export function map<T,R>(readable: Readable<T>, writable: Writable<R>, mapper: (value: T) => R|Thenable<R>): void {
+// Return an ender callback that first runs an optional user-supplied ender,
+// followed by the default ender that always ends the stream.
+// It's refactored out, because it's currently a bit tricky and exact behavior
+// may change, see TODO in implementation.
+function composeEnders(
+	ender: (error?: Error) => void|Thenable<void>,
+	defaultEnder: (error?: Error) => void|Thenable<void>
+): (error?: Error) => void|Thenable<void> {
+	if (!ender) {
+		return defaultEnder;
+	}
+	return (error?: Error) => {
+		// TODO: an error returned from ender is currently passed on to next
+		// stream, if stream was not ended with an error yet.
+		// It'd maybe be better to not have the next stream be ended when an
+		// error occurred in this ender, but there's no way to send another
+		// end(), so we have to close it somehow...
+		return Promise.resolve(error).then(ender).then(
+			() => defaultEnder(error),
+			(enderError) => {
+				defaultEnder(error || enderError);
+				return Promise.reject(enderError);
+			}
+		);
+	};
+}
+
+export function map<T,R>(
+	readable: Readable<T>,
+	writable: Writable<R>,
+	mapper: (value: T) => R|Thenable<R>,
+	ender?: (error?: Error) => void|Thenable<void>,
+	aborter?: (error: Error) => void
+): void {
 	writable.aborted().catch((err) => readable.abort(err));
 	readable.forEach(
-		(v: T): Promise<void> => {
-			return writable.write(mapper(v));
-		},
-		(error?: Error) => writable.end(error, readable.result())
+		(v: T) => writable.write(mapper(v)),
+		composeEnders(ender, (error?: Error) => writable.end(error, readable.result())),
+		aborter
 	);
 }
 
-export function filter<T>(readable: Readable<T>, writable: Writable<T>, filterer: (value: T) => boolean|Thenable<boolean>): void {
+export function filter<T>(
+	readable: Readable<T>,
+	writable: Writable<T>,
+	filterer: (value: T) => boolean|Thenable<boolean>,
+	ender?: (error?: Error) => void|Thenable<void>,
+	aborter?: (error: Error) => void
+): void {
 	writable.aborted().catch((err) => readable.abort(err));
 	readable.forEach(
 		(v: T): void|Promise<void> => {
@@ -50,7 +88,8 @@ export function filter<T>(readable: Readable<T>, writable: Writable<T>, filterer
 				});
 			}
 		},
-		(error?: Error) => writable.end(error, readable.result())
+		composeEnders(ender, (error?: Error) => writable.end(error, readable.result())),
+		aborter
 	);
 }
 

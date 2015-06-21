@@ -575,15 +575,25 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * value (or promise for a value), similar to e.g. `Array`'s `map()`.
 	 *
 	 * Stream end in the input stream (normal or with error) will be passed to
-	 * the returned stream.
+	 * the output stream, after awaiting the result of the optional ender.
 	 *
-	 * @param mapper Callback which receives each value from this stream, and
-	 *               must produce a new value (or promise for a value).
-	 * @return New stream with mapped values.
+	 * Any error (thrown or rejection) in mapper or ender is returned to the
+	 * input stream.
+	 *
+	 * @param mapper  Callback which receives each value from this stream, and
+	 *                must produce a new value (or promise for a value)
+	 * @param ender   Called when stream is ending, result is waited for before
+	 *                passing on `end()`
+	 * @param aborter Called when stream is aborted
+	 * @return New stream with mapped values
 	 */
-	map<R>(mapper: (value: T) => R|Thenable<R>): ReadableStream<R> {
+	map<R>(
+		mapper: (value: T) => R|Thenable<R>,
+		ender?: (error?: Error) => void|Thenable<void>,
+		aborter?: (error: Error) => void
+	): ReadableStream<R> {
 		let output = new Stream<R>();
-		map(this, output, mapper);
+		map(this, output, mapper, ender, aborter);
 		return output;
 	}
 
@@ -594,16 +604,26 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * Similar to e.g. `Array`'s `filter()`.
 	 *
 	 * Stream end in the input stream (normal or with error) will be passed to
-	 * the returned stream.
+	 * the output stream, after awaiting the result of the optional ender.
+	 *
+	 * Any error (thrown or rejection) in mapper or ender is returned to the
+	 * input stream.
 	 *
 	 * @param filterer Callback which receives each value from this stream,
 	 *                 input value is written to output if callback returns a
 	 *                 (promise for) a truthy value.
+	 * @param ender    Called when stream is ending, result is waited for before
+	 *                 passing on `end()`
+	 * @param aborter  Called when stream is aborted
 	 * @return New stream with filtered values.
 	 */
-	filter(filterer: (value: T) => boolean|Thenable<boolean>): ReadableStream<T> {
+	filter(
+		filterer: (value: T) => boolean|Thenable<boolean>,
+		ender?: (error?: Error) => void|Thenable<void>,
+		aborter?: (error: Error) => void
+	): ReadableStream<T> {
 		let output = new Stream<T>();
-		filter(this, output, filterer);
+		filter(this, output, filterer, ender, aborter);
 		return output;
 	}
 
