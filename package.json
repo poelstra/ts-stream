@@ -1,6 +1,6 @@
 {
   "name": "ts-stream",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Type-safe object streams with seamless support for backpressure, ending, and error handling",
   "main": "lib/index.js",
   "scripts": {
