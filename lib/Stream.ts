@@ -6,7 +6,7 @@
  * License: MIT
  */
 
-"use strict";
+"use strict"; /* istanbul ignore next */ // ignores Typescript's __extend() function
 
 import { Promise, Thenable, BaseError } from "ts-promise";
 import * as assert from "assert";
