@@ -31,15 +31,16 @@ export interface Common<T> {
 	result(): Promise<void>;
 
 	/**
-	 * Signal stream abort to writers.
+	 * Signal stream abort.
 	 *
-	 * If an aborter callback is set by `forEach()`, it will (asynchronously) be
-	 * called with the abort reason to allow early termination of a pending
-	 * operation.
+	 * If an `aborter` callback is set by `forEach()` and the stream has not
+	 * ended yet, it will (asynchronously) be called with the abort reason, to
+	 * allow early termination of pending operation(s).
 	 *
 	 * If a reader is currently processing a value (i.e. a promise returned from
 	 * a read callback is not resolved yet), that operation is still allowed to
-	 * complete.
+	 * complete (although it can e.g. be cancelled by the `aborter` callback
+	 * to `forEach()`).
 	 *
 	 * Any pending and future `write()`s after that will be rejected with the
 	 * given error.
@@ -48,8 +49,10 @@ export interface Common<T> {
 	 * after which the stream's `ender` callback is called with the abort error
 	 * (i.e. any error passed to `end()` is ignored).
 	 *
-	 * The abort is ignored if the stream's end handler has already been called,
-	 * or another abort is already pending.
+	 * The abort is ignored if the stream is already aborted.
+	 * Note that it's possible to abort an ended stream, to allow the abort to
+	 * 'bubble' to other parts in a chain of streams, which may not have ended
+	 * yet. It will not change the end-state of this part of the stream though.
 	 *
 	 * @param reason Error value to signal a reason for the abort
 	 */
@@ -527,15 +530,16 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	}
 
 	/**
-	 * Signal stream abort to writers.
+	 * Signal stream abort.
 	 *
-	 * If an aborter callback is set by `forEach()`, it will (asynchronously) be
-	 * called with the abort reason to allow early termination of a pending
-	 * operation.
+	 * If an `aborter` callback is set by `forEach()` and the stream has not
+	 * ended yet, it will (asynchronously) be called with the abort reason, to
+	 * allow early termination of pending operation(s).
 	 *
 	 * If a reader is currently processing a value (i.e. a promise returned from
 	 * a read callback is not resolved yet), that operation is still allowed to
-	 * complete.
+	 * complete (although it can e.g. be cancelled by the `aborter` callback
+	 * to `forEach()`).
 	 *
 	 * Any pending and future `write()`s after that will be rejected with the
 	 * given error.
@@ -544,13 +548,15 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * after which the stream's `ender` callback is called with the abort error
 	 * (i.e. any error passed to `end()` is ignored).
 	 *
-	 * The abort is ignored if the stream's end handler has already been called,
-	 * or another abort is already pending.
+	 * The abort is ignored if the stream is already aborted.
+	 * Note that it's possible to abort an ended stream, to allow the abort to
+	 * 'bubble' to other parts in a chain of streams, which may not have ended
+	 * yet. It will not change the end-state of this part of the stream though.
 	 *
 	 * @param reason Error value to signal a reason for the abort
 	 */
 	abort(reason: Error): void {
-		if (this._abortPromise || this._endPending || this._ended) {
+		if (this._abortPromise) {
 			return;
 		}
 		this._abortPromise = Promise.reject(reason);
@@ -561,7 +567,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	/**
 	 * Obtain promise that resolves to a rejection when `abort()` is called.
 	 *
-	 * Useful to pass abort to upstream sources.
+	 * Useful to pass abort to up- and down-stream sources.
 	 *
 	 * @return Promise that is rejected with abort error when stream is aborted
 	 */
@@ -789,6 +795,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 				this._ended = this._endPending.error || eof;
 				this._ending = undefined;
 				this._endPending = undefined;
+				this._aborter = undefined; // no longer call aborter after end handler has finished
 				let p = result ? this._readBusy.then(() => result) : this._readBusy;
 				this._resultDeferred.resolve(p);
 			}

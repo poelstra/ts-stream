@@ -58,6 +58,7 @@ export function map<T,R>(
 	aborter?: (error: Error) => void
 ): void {
 	writable.aborted().catch((err) => readable.abort(err));
+	readable.aborted().catch((err) => writable.abort(err));
 	readable.forEach(
 		(v: T) => writable.write(mapper(v)),
 		composeEnders(ender, (error?: Error) => writable.end(error, readable.result())),
@@ -73,6 +74,7 @@ export function filter<T>(
 	aborter?: (error: Error) => void
 ): void {
 	writable.aborted().catch((err) => readable.abort(err));
+	readable.aborted().catch((err) => writable.abort(err));
 	readable.forEach(
 		(v: T): void|Promise<void> => {
 			var b = filterer(v);

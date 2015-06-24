@@ -37,6 +37,10 @@ function readInto<T>(stream: ReadableStream<T>, into: T[]): Promise<void> {
 function noop(): void {
 }
 
+function identity<T>(arg: T): T {
+	return arg;
+}
+
 describe("Stream", () => {
 	var s: Stream<number>;
 	var boomError: Error;
@@ -324,11 +328,41 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(abortResult).to.equal(abortError);
 		});
+		it("no longer calls aborter ender finished", () => {
+			let w1 = s.write(1);
+			let we = s.end();
+			let abortResult: Error = null;
+			s.forEach(
+				(v) => undefined,
+				undefined,
+				(e) => { abortResult = e; }
+			);
+
+			Promise.flush();
+			expect(abortResult).to.equal(null);
+			expect(s.isEnded()).to.equal(true);
+
+			s.abort(abortError);
+
+			Promise.flush();
+			expect(abortResult).to.equal(null);
+			expect(s.aborted().reason()).to.equal(abortError);
+		});
 	}); // abort()
 
 	describe("aborted()", () => {
 		it("is rejected when abort is called", () => {
 			expect(s.aborted().isPending()).to.equal(true);
+			s.abort(abortError);
+			expect(s.aborted().reason()).to.equal(abortError);
+		});
+		it("is rejected when abort is called, even after stream end", () => {
+			s.end();
+			s.forEach(noop);
+			Promise.flush();
+			expect(s.aborted().isPending()).to.equal(true);
+			expect(s.isEnded()).to.equal(true);
+
 			s.abort(abortError);
 			expect(s.aborted().reason()).to.equal(abortError);
 		});
@@ -780,6 +814,20 @@ describe("Stream", () => {
 			mapped.abort(abortError);
 			Promise.flush();
 			expect(abortResult).to.equal(abortError);
+		});
+
+		it("aborts from source to sink", () => {
+			let sink = s.map(identity).map(identity);
+			s.abort(abortError);
+			Promise.flush();
+			expect(sink.aborted().reason()).to.equal(abortError);
+		});
+
+		it("aborts from sink to source", () => {
+			let sink = s.map(identity).map(identity);
+			sink.abort(abortError);
+			Promise.flush();
+			expect(s.aborted().reason()).to.equal(abortError);
 		});
 	}); // map()
 });
