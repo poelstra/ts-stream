@@ -126,13 +126,19 @@ var i = 0;
 p = p.then(() => { console.log("write", i); return source.write(i++); });
 p = p.then(() => { console.log("write", i); return source.write(i++); });
 p = p.then(() => { console.log("write", i); return source.write(i++); });
-p = p.then(() => { console.log("write end"); return source.end(); });
-p.done(
-    () => console.log("write done"),
-    (err) => {
-        console.log("write failed", err);
-        source.abort(err);
-    }
+p.then(
+	() => {
+		console.log("write end")
+		return source.end();
+	},
+	(err) => {
+		console.log("write failed", err);
+		return source.end(err);
+	}
+)
+.done(
+	() => console.log("write end ok"),
+	(err) => console.log("write end failed", err)
 );
 
 source.forEach((n) => console.log("read", n), (err) => console.log("read end", err || "ok"));
@@ -249,13 +255,14 @@ The API is not stable yet, but the examples should give a good feel for what it
 will look like. Experiments are being performed to model certain real-world
 scenarios, fine-tuning the API as we go.
 
-Some things are likely to change, such as the 'grouping'/naming of certain
-functionality (especially Stream and Transform and their `map` etc).
-Things like forEach() might return the Stream or result of `ended()` for more
-easy chaining, etc.
-Then, there's some tricky corner cases with regards to handling of errors in the
+There's some tricky corner cases with regards to handling of errors in the
 face of e.g. `abort()`. Various TODO's are sprinkled through the code with ideas
 to handle such cases.
+A number of methods are still marked as experimental (and basically undocumented
+nor unit-tested). They need to be refined (probably by making a few examples
+with them) or removed.
+Also some smaller things may change, such as the 'grouping'/naming of certain
+functionality (especially Stream and Transform and their `map` etc).
 
 Feedback on what you like and dislike about the API is welcome! Just file an
 issue on the Github project!
@@ -273,7 +280,7 @@ npm install
 This will automatically install all (development-)dependencies, compile and run
 unit tests.
 
-Run `npm run build` and `npm test` to recompile and run the tests again.
+Run `npm test` to recompile and run the tests again.
 
 If you want to debug the Typescript code, it may be helpful to use the
 sourcemaps provided during compile. Just `require("source-map-support").install();`
@@ -283,14 +290,18 @@ in your program.
 
 Stuff that needs to be done before calling it 1.0, in arbitrary order (more
 items will be added to this list though...):
-- More and better documentation
-- More unit tests, cleanup of existing ones (aiming for 100% coverage)
+- Stabilize API (most notably abort handling and methods marked experimental)
+- More and better documentation, mostly updating the examples and including
+  abort handling, error best-practices, etc.
+- More unit tests, cleanup of existing ones (all 'core' functionality is already
+  100% covered except filter(), aiming for 100% coverage though)
 - Set of 'standard' Transforms like Merge, Split, Queue, Batch, Limit, etc.
 - Wrappers for Node streams, iterators, etc.
 - Verify browser support
 - Add UMD version of module?
 - Support transducers (if possible: need backpressure)
 - Address TODO's in code
+- Refine or remove experimental stuff
 
 # Changelog
 

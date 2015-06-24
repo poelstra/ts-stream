@@ -17,7 +17,19 @@ var i = 0;
 p = p.then(() => { console.log("write", i); return source.write(i++); });
 p = p.then(() => { console.log("write", i); return source.write(i++); });
 p = p.then(() => { console.log("write", i); return source.write(i++); });
-p = p.then(() => { console.log("write end"); return source.end(); });
-p.done(() => console.log("write done"), (err) => console.log("write failed", err));
+p.then(
+	() => {
+		console.log("write end")
+		return source.end();
+	},
+	(err) => {
+		console.log("write failed", err);
+		return source.end(err);
+	}
+)
+.done(
+	() => console.log("write end ok"),
+	(err) => console.log("write end failed", err)
+);
 
 source.forEach((n) => console.log("read", n), (err) => console.log("read end", err || "ok"));
