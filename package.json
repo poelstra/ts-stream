@@ -26,7 +26,7 @@
   },
   "homepage": "https://github.com/poelstra/ts-stream#readme",
   "dependencies": {
-    "ts-promise": "^0.1.5"
+    "ts-promise": "^0.2.1"
   },
   "typescript": {
     "definition": "./ts-stream.d.ts"

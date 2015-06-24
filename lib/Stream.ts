@@ -797,7 +797,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 
 		// If written value resolved to a rejection, make its write() fail
 		if (writer.value.isRejected()) {
-			writer.resolveWrite(writer.value);
+			writer.resolveWrite(<Thenable<any>>writer.value);
 			this._writers.shift();
 			// Pump again
 			Promise.resolve().done(this._pumper);

@@ -113,7 +113,7 @@ describe("Stream", () => {
 	});
 
 	it("write fails when writing synchronously rejected promise", () => {
-		var wp1 = s.write(Promise.reject(boomError));
+		var wp1 = s.write(Promise.reject<number>(boomError));
 		var wp2 = s.write(42);
 		var ep = s.end();
 		var rp = readInto(s, results);
@@ -550,7 +550,7 @@ describe("Stream", () => {
 		it("bounces returned rejection", () => {
 			var mapped = s.map((n) => {
 				if (n === 1) {
-					return Promise.reject(boomError);
+					return Promise.reject<number>(boomError);
 				} else {
 					return n * 2;
 				}
