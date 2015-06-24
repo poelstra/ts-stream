@@ -108,17 +108,21 @@ export interface Readable<T> extends Common<T> {
 	 * any stream end errors to the writer, and otherwise directly acknowledges
 	 * the end-of-stream.
 	 *
+	 * The return value of `forEach()` is `result()`, a promise that resolves
+	 * when all parts in the stream(-chain) have completely finished.
+	 *
 	 * It is an error to call `forEach()` multiple times.
 	 *
 	 * @param reader  Callback called with every written value
 	 * @param ender   Optional callback called when stream is ended
 	 * @param aborter Optional callback called when stream is aborted
+	 * @return Stream's end result (i.e. `result()`)
 	 */
 	forEach(
 		reader: (value: T) => void|Thenable<void>,
 		ender?: (error?: Error) => void|Thenable<void>,
 		aborter?: (error: Error) => void
-	): void;
+	): Promise<void>;
 }
 
 /**
@@ -524,7 +528,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		reader: (value: T) => void|Thenable<void>,
 		ender?: (error?: Error) => void|Thenable<void>,
 		aborter?: (error: Error) => void
-	): void {
+	): Promise<void> {
 		if (this._reader) {
 			throw new Error("forEach() can only be called once per stream");
 		}
@@ -535,6 +539,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		this._ender = ender;
 		this._aborter = aborter;
 		this._pump();
+		return this.result();
 	}
 
 	/**

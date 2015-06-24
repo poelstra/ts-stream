@@ -371,26 +371,28 @@ describe("Stream", () => {
 	describe("forEach()", () => {
 		it("handles empty stream", () => {
 			var endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
-			s.forEach(pushResult, (e?: Error) => { endResult = e; });
+			let res = s.forEach(pushResult, (e?: Error) => { endResult = e; });
 			s.end();
 			Promise.flush();
 			expect(results).to.deep.equal([]);
 			expect(endResult).to.equal(undefined);
+			expect(res.isFulfilled()).to.equal(true);
 		});
 
 		it("handles a single value", () => {
 			var endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
-			s.forEach(pushResult, (e?: Error) => { endResult = e; });
+			let res = s.forEach(pushResult, (e?: Error) => { endResult = e; });
 			s.write(1);
 			s.end();
 			Promise.flush();
 			expect(results).to.deep.equal([1]);
 			expect(endResult).to.equal(undefined);
+			expect(res.isFulfilled()).to.equal(true);
 		});
 
 		it("handles multiple values", () => {
 			var endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
-			s.forEach(pushResult, (e?: Error) => { endResult = e; });
+			let res = s.forEach(pushResult, (e?: Error) => { endResult = e; });
 			s.write(1);
 			s.write(2);
 			s.write(3);
@@ -398,12 +400,13 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(results).to.deep.equal([1, 2, 3]);
 			expect(endResult).to.equal(undefined);
+			expect(res.isFulfilled()).to.equal(true);
 		});
 
 		it("handles error in reader", () => {
 			var endError = new Error("end boom");
 			var endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
-			s.forEach((n) => {
+			let res = s.forEach((n) => {
 				throw boomError;
 			}, (e?: Error) => { endResult = e; });
 
@@ -419,6 +422,7 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(endResult).to.equal(endError);
 			expect(ep.value()).to.equal(undefined);
+			expect(res.isFulfilled()).to.equal(true);
 		});
 
 		it("handles error thrown in reader", () => {
@@ -427,7 +431,7 @@ describe("Stream", () => {
 			var writeError: Error;
 			var endResult: Error;
 			s.write(1).catch((e) => { writeError = e; });
-			s.forEach((v) => { throw boomError }, (e) => { endResult = e; });
+			let res = s.forEach((v) => { throw boomError }, (e) => { endResult = e; });
 			Promise.flush();
 			expect(writeError).to.equal(boomError);
 			expect(endResult).to.be.undefined;
@@ -442,10 +446,11 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(writeError).to.be.undefined;
 			expect(endResult).to.equal(endBoom);
+			expect(res.isFulfilled()).to.equal(true);
 		});
 
 		it("can use a default ender", () => {
-			s.forEach(
+			let res = s.forEach(
 				(v) => { results.push(v); }
 			);
 			s.write(1);
@@ -453,10 +458,11 @@ describe("Stream", () => {
 			s.end();
 			Promise.flush();
 			expect(results).to.deep.equal([1, 2]);
+			expect(res.isFulfilled()).to.equal(true);
 		});
 
 		it("returns errors by default", () => {
-			s.forEach(
+			let res = s.forEach(
 				(v) => { results.push(v); }
 			);
 			s.write(1);
@@ -465,6 +471,7 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(results).to.deep.equal([1, 2]);
 			expect(we.reason()).to.equal(boomError);
+			expect(res.reason()).to.equal(boomError);
 		});
 
 		it("disallows multiple attach", () => {
