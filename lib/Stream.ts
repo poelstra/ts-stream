@@ -14,9 +14,61 @@ import * as assert from "assert";
 import { Transform, map, filter } from "./Transform";
 
 /**
+ * Required methods for both readable and writable parts of a stream.
+ */
+export interface Common<T> {
+	/**
+	 * Obtain a promise that resolves when all parts of a stream chain have
+	 * completely ended.
+	 *
+	 * Specifically:
+	 * - `end()` has been called (possibly with an Error),
+	 * - `ender` callback has run and its returned promise resolved,
+	 * - `end()`'s result parameter (if any) has been resolved.
+	 *
+	 * @return Promise resolved when stream chain has completely ended
+	 */
+	result(): Promise<void>;
+
+	/**
+	 * Signal stream abort to writers.
+	 *
+	 * If an aborter callback is set by `forEach()`, it will (asynchronously) be
+	 * called with the abort reason to allow early termination of a pending
+	 * operation.
+	 *
+	 * If a reader is currently processing a value (i.e. a promise returned from
+	 * a read callback is not resolved yet), that operation is still allowed to
+	 * complete.
+	 *
+	 * Any pending and future `write()`s after that will be rejected with the
+	 * given error.
+	 *
+	 * The stream is not ended until the writer explicitly `end()`s the stream,
+	 * after which the stream's `ender` callback is called with the abort error
+	 * (i.e. any error passed to `end()` is ignored).
+	 *
+	 * The abort is ignored if the stream's end handler has already been called,
+	 * or another abort is already pending.
+	 *
+	 * @param reason Error value to signal a reason for the abort
+	 */
+	abort(reason: Error): void;
+
+	/**
+	 * Obtain promise that resolves to a rejection when `abort()` is called.
+	 *
+	 * Useful to pass abort to upstream sources.
+	 *
+	 * @return Promise that is rejected with abort error when stream is aborted
+	 */
+	aborted(): Promise<void>;
+}
+
+/**
  * Required methods for the readable part of a stream.
  */
-export interface Readable<T> {
+export interface Readable<T> extends Common<T> {
 	/**
 	 * Read all values from stream, optionally waiting for explicit stream end.
 	 *
@@ -60,47 +112,12 @@ export interface Readable<T> {
 		ender?: (error?: Error) => void|Thenable<void>,
 		aborter?: (error: Error) => void
 	): void;
-
-	/**
-	 * Signal stream abort to writers.
-	 *
-	 * If an aborter callback is set by `forEach()`, it will (asynchronously) be
-	 * called with the abort reason to allow early termination of a pending
-	 * operation.
-	 *
-	 * If a reader is currently processing a value (i.e. a promise returned from
-	 * a read callback is not resolved yet), that operation is still allowed to
-	 * complete.
-	 *
-	 * Any pending and future `write()`s after that will be rejected with the
-	 * given error.
-	 *
-	 * The stream is not ended until the writer explicitly `end()`s the stream,
-	 * after which the stream's `ender` callback is called with the abort error
-	 * (i.e. any error passed to `end()` is ignored).
-	 *
-	 * The abort is ignored if the stream's end handler has already been called,
-	 * or another abort is already pending.
-	 *
-	 * @param reason Error value to signal a reason for the abort
-	 */
-	abort(reason: Error): void;
-
-	/**
-	 * Obtain a promise that resolves when the stream has completely ended:
-	 * - `end()` has been called (possibly with an Error),
-	 * - `ender` callback has run and its returned promise resolved,
-	 * - `end()`'s result parameter (if any) has been resolved.
-	 *
-	 * @return Promise resolved when stream has completely ended
-	 */
-	result(): Promise<void>;
 }
 
 /**
  * Required methods for the writable part of a stream.
  */
-export interface Writable<T> {
+export interface Writable<T> extends Common<T> {
 	/**
 	 * Write value (or promise for value) to stream.
 	 *
@@ -145,29 +162,39 @@ export interface Writable<T> {
 	 *         end-of-stream
 	 */
 	end(error?: Error, result?: Thenable<void>): Promise<void>;
+}
+
+export interface CommonStream<T> {
+	/**
+	 * Determine whether `end()` has been called on the stream, but the stream
+	 * is still processing it.
+	 *
+	 * @return true when `end()` was called but not acknowledged yet, false
+	 *         otherwise
+	 */
+	isEnding(): boolean;
 
 	/**
-	 * Obtain promise that resolves to a rejection when `abort()` is called.
+	 * Determine whether stream has completely ended (i.e. end handler has been
+	 * called and its return Thenable, if any, is resolved).
 	 *
-	 * Useful to pass abort to upstream sources.
-	 *
-	 * @return Promise that is rejected with abort error when stream is aborted
+	 * @return true when stream has ended, false otherwise
 	 */
-	aborted(): Promise<void>;
+	isEnded(): boolean;
+
+	/**
+	 * Determine whether `end()` has been called on the stream.
+	 *
+	 * @return true when `end()` was called
+	 */
+	isEndingOrEnded(): boolean;
 }
 
 /**
  * Readable part of a generic Stream, which contains handy helpers such as
  * .map() in addition to the basic requirements of a Readable interface.
  */
-export interface ReadableStream<T> extends Readable<T> {
-	/**
-	 * Determine whether stream has completely ended (i.e. end handler has been
-	 * called and its return Thenable, if any, is resolved).
-	 * @return true when stream has ended, false otherwise
-	 */
-	isEnded(): boolean;
-
+export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 	/**
 	 * Run all input values through a mapping callback, which must produce a new
 	 * value (or promise for a value), similar to e.g. `Array`'s `map()`.
@@ -214,24 +241,7 @@ export interface ReadableStream<T> extends Readable<T> {
  * Writable part of a generic Stream, which contains handy helpers such as
  * .mappedBy() in addition to the basic requirements of a Writable interface.
  */
-export interface WritableStream<T> extends Writable<T> {
-	/**
-	 * Obtain a promise that resolves when the stream has completely ended:
-	 * - `end()` has been called (possibly with an Error),
-	 * - `ender` callback has run and its returned promise resolved,
-	 * - `end()`'s result parameter (if any) has been resolved.
-	 *
-	 * @return Promise resolved when stream has completely ended
-	 */
-	result(): Promise<void>;
-
-	/**
-	 * Determine whether stream has completely ended (i.e. end handler has been
-	 * called and its return Thenable, if any, is resolved).
-	 * @return true when stream has ended, false otherwise
-	 */
-	isEnded(): boolean;
-
+export interface WritableStream<T> extends Writable<T>, CommonStream<T> {
 	// TODO Experimental
 	writeEach(writer: () => T|Thenable<T>|void|Thenable<void>): Promise<void>;
 
