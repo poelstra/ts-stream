@@ -305,6 +305,13 @@ items will be added to this list though...):
 
 # Changelog
 
+0.6.0 (2015-06-24):
+- Return `result()` from `forEach()` (#11)
+- Implement `isEnding()` and `isEndingOrEnded()` (#12)
+- Make `abort()` flow both ways (up- and downstream) by default (i.e. in `map()`, `filter()`)
+- Move `abort()`, `aborted()`, `isEnding()`, `isEnded()`, `isEndingOrEnded()` to common interfaces
+- Errors in `map()`/`filter()` end-callback wait for rest of stream to end
+
 0.5.1 (2015-06-21):
 - Add `aborter` callback to `forEach()` (#14)
 - Add `aborted()` to allow abort to be passed to upstream
