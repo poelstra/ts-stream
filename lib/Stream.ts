@@ -349,10 +349,16 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 
 	/**
 	 * Set to an instance of an Eof object, containing optional error and final
+	 * result of this stream. Set when `end()` is called.
+	 */
+	private _ending: Eof;
+
+	/**
+	 * Set to an instance of an Eof object, containing optional error and final
 	 * result of this stream. Set when `_ender` is being called but not finished
 	 * yet, unset when `_ended` is set.
 	 */
-	private _ending: Eof;
+	private _endPending: Eof;
 
 	/**
 	 * Set to the error passed to `end()` (or the special value `eof`) when the
@@ -441,7 +447,11 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		if (!(error === undefined || error === null || error instanceof Error)) {
 			throw new TypeError("invalid argument to end(): must be undefined, null or Error object");
 		}
-		let valuePromise = Promise.resolve(new Eof(error, endedResult));
+		let eof = new Eof(error, endedResult);
+		if (!this._ending && !this._ended) {
+			this._ending = eof;
+		}
+		let valuePromise = Promise.resolve(eof);
 		let writeDone = Promise.defer();
 		this._writers.push({
 			value: valuePromise,
@@ -530,7 +540,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param reason Error value to signal a reason for the abort
 	 */
 	abort(reason: Error): void {
-		if (this._abortPromise || this._ending || this._ended) {
+		if (this._abortPromise || this._endPending || this._ended) {
 			return;
 		}
 		this._abortPromise = Promise.reject(reason);
@@ -562,12 +572,32 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	}
 
 	/**
+	 * Determine whether `end()` has been called on the stream, but the stream
+	 * is still processing it.
+	 *
+	 * @return true when `end()` was called but not acknowledged yet, false
+	 *         otherwise
+	 */
+	isEnding(): boolean {
+		return !!this._ending;
+	}
+
+	/**
 	 * Determine whether stream has completely ended (i.e. end handler has been
 	 * called and its return Thenable, if any, is resolved).
 	 * @return true when stream has ended, false otherwise
 	 */
 	isEnded(): boolean {
 		return !!this._ended;
+	}
+
+	/**
+	 * Determine whether `end()` has been called on the stream.
+	 *
+	 * @return true when `end()` was called
+	 */
+	isEndingOrEnded(): boolean {
+		return this.isEnding() || this.isEnded();
 	}
 
 	/**
@@ -744,10 +774,11 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			// Previous reader/ender has resolved, return its result to the
 			// corresponding write() or end() call
 			this._writers.shift().resolveWrite(this._readBusy);
-			if (this._ending) {
-				let result = this._ending.result;
-				this._ended = this._ending.error || eof;
+			if (this._endPending) {
+				let result = this._endPending.result;
+				this._ended = this._endPending.error || eof;
 				this._ending = undefined;
+				this._endPending = undefined;
 				let p = result ? this._readBusy.then(() => result) : this._readBusy;
 				this._resultDeferred.resolve(p);
 			}
@@ -810,8 +841,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		let value = writer.value.value();
 		if (value instanceof Eof) {
 			// EOF, with or without error
-			assert(!this._ended && !this._ending);
-			this._ending = value;
+			assert(!this._ended && !this._endPending);
+			this._endPending = value;
 			let ender = this._ender; // Ensure calling without `this`
 			this._ender = undefined; // Prevent calling again
 			// Call with end error or override with abort reason if any

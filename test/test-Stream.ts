@@ -465,7 +465,9 @@ describe("Stream", () => {
 	}); // end()
 
 	describe("isEnded()", () => {
-		it("indicates stream end", () => {
+		it("indicates stream end after ender has run", () => {
+			expect(s.isEnded()).to.equal(false);
+
 			s.end();
 			Promise.flush();
 			expect(s.isEnded()).to.equal(false);
@@ -480,6 +482,55 @@ describe("Stream", () => {
 			expect(s.isEnded()).to.equal(true);
 		});
 	}); // isEnded()
+
+	describe("isEnding()", () => {
+		it("indicates stream is ending", () => {
+			expect(s.isEnding()).to.equal(false);
+
+			s.end();
+			Promise.flush();
+			expect(s.isEnding()).to.equal(true);
+
+			var d = Promise.defer();
+			s.forEach(noop, (e) => d.promise);
+			Promise.flush();
+			expect(s.isEnding()).to.equal(true);
+
+			d.resolve();
+			Promise.flush();
+			expect(s.isEnding()).to.equal(false);
+		});
+		it("ignores ending after end", () => {
+			expect(s.isEnding()).to.equal(false);
+			s.forEach(noop);
+			s.end();
+			Promise.flush();
+			expect(s.isEnding()).to.equal(false);
+
+			s.end().catch(noop);
+			Promise.flush();
+			expect(s.isEnding()).to.equal(false);
+		});
+	}); // isEnding()
+
+	describe("isEndingOrEnded()", () => {
+		it("indicates stream is ending or ended", () => {
+			expect(s.isEndingOrEnded()).to.equal(false);
+
+			s.end();
+			Promise.flush();
+			expect(s.isEndingOrEnded()).to.equal(true);
+
+			var d = Promise.defer();
+			s.forEach(noop, (e) => d.promise);
+			Promise.flush();
+			expect(s.isEndingOrEnded()).to.equal(true);
+
+			d.resolve();
+			Promise.flush();
+			expect(s.isEndingOrEnded()).to.equal(true);
+		});
+	}); // isEnding()
 
 	describe("result()", () => {
 		it("indicates stream end", () => {
