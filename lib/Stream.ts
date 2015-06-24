@@ -559,8 +559,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		if (this._abortPromise) {
 			return;
 		}
-		this._abortPromise = Promise.reject(reason);
-		this._abortDeferred.resolve(this._abortPromise);
+		this._abortDeferred.reject(reason);
+		this._abortPromise = this._abortDeferred.promise;
 		this._pump();
 	}
 
