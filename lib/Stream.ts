@@ -80,10 +80,12 @@ export interface Readable<T> extends Common<T> {
 	 * `ender` is called once, when the writer `end()`s the stream, either with
 	 * or without an error.
 	 *
-	 * Both callbacks can return a promise to indicate when the value or
-	 * end-of-stream condition has been completely processed. This ensures that
-	 * a fast writer can never overload a slow reader, and is called
-	 * 'backpressure'.
+	 * `aborter` is called once if the stream is aborted and has not ended yet.
+	 *
+	 * `reader` and `ender` callbacks can return a promise to indicate when the
+	 * value or end-of-stream condition has been completely processed. This
+	 * ensures that a fast writer can never overload a slow reader, and is
+	 * called 'backpressure'.
 	 *
 	 * The corresponding `write()` or `end()` operation is blocked until the
 	 * value returned from the reader or ender callback is resolved. If the
@@ -94,11 +96,13 @@ export interface Readable<T> extends Common<T> {
 	 * after `forEach()`, `write()`, `end()` or `abort()` returns), and their
 	 * `this` argument will be undefined.
 	 *
-	 * The reader and ender callbacks are never called again before their
+	 * The `reader` and `ender` callbacks are never called again before their
 	 * previously returned promise is resolved/rejected.
 	 *
-	 * The aborter callback can be called while a reader callback's promise is
-	 * still pending.
+	 * The `aborter` callback can be called while a reader callback's promise is
+	 * still pending, and should try to let `reader` or `ender` finish as fast
+	 * as possible. It will not be called after the output of `ender` has
+	 * resolved.
 	 *
 	 * If no `ender` is given, a default end handler is installed that returns
 	 * any stream end errors to the writer, and otherwise directly acknowledges
@@ -482,10 +486,12 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * `ender` is called once, when the writer `end()`s the stream, either with
 	 * or without an error.
 	 *
-	 * Both callbacks can return a promise to indicate when the value or
-	 * end-of-stream condition has been completely processed. This ensures that
-	 * a fast writer can never overload a slow reader, and is called
-	 * 'backpressure'.
+	 * `aborter` is called once if the stream is aborted and has not ended yet.
+	 *
+	 * `reader` and `ender` callbacks can return a promise to indicate when the
+	 * value or end-of-stream condition has been completely processed. This
+	 * ensures that a fast writer can never overload a slow reader, and is
+	 * called 'backpressure'.
 	 *
 	 * The corresponding `write()` or `end()` operation is blocked until the
 	 * value returned from the reader or ender callback is resolved. If the
@@ -496,11 +502,13 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * after `forEach()`, `write()`, `end()` or `abort()` returns), and their
 	 * `this` argument will be undefined.
 	 *
-	 * The reader and ender callbacks are never called again before their
+	 * The `reader` and `ender` callbacks are never called again before their
 	 * previously returned promise is resolved/rejected.
 	 *
-	 * The aborter callback can be called while a reader callback's promise is
-	 * still pending.
+	 * The `aborter` callback can be called while a reader callback's promise is
+	 * still pending, and should try to let `reader` or `ender` finish as fast
+	 * as possible. It will not be called after the output of `ender` has
+	 * resolved.
 	 *
 	 * If no `ender` is given, a default end handler is installed that returns
 	 * any stream end errors to the writer, and otherwise directly acknowledges
