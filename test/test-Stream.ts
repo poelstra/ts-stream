@@ -782,26 +782,71 @@ describe("Stream", () => {
 			expect(r.reason()).to.equal(boomError);
 		});
 
-		it("leaves original end error intact", () => {
-			let endError = new Error("endError");
+		it("returns synchronous error in ender to writer even if downstream ender fails", () => {
 			let endResult: Error = null;
 			let mapped = s.map(
 				(n) => n * 2,
 				(e) => { endResult = e; throw boomError; }
 			);
-			let r = readInto(mapped, results);
+			let forEachEndResult: Error = null;
+			mapped.forEach(
+				(n) => { results.push(n); },
+				(e) => {
+					forEachEndResult = e;
+					throw new Error("some other error");
+				}
+			);
 			let w1 = s.write(1);
-			let we = s.end(endError);
+			let we = s.end();
 
 			Promise.flush();
 			expect(results).to.deep.equal([2]);
-			expect(endResult).to.equal(endError);
+			expect(endResult).to.equal(undefined);
 			expect(w1.isFulfilled()).to.equal(true);
 			expect(we.reason()).to.equal(boomError);
 			expect(mapped.isEnded()).to.equal(true);
 			expect(s.isEnded()).to.equal(true);
 			expect(s.result().reason()).to.equal(boomError);
-			expect(r.reason()).to.equal(endError);
+			expect(forEachEndResult).to.equal(boomError);
+		});
+
+		it("leaves original end error intact and waits for stream to end", () => {
+			let endError = new Error("endError");
+			let mapEndResult: Error = null;
+			let mapped = s.map(
+				(n) => n * 2,
+				(e) => { mapEndResult = e; throw boomError; }
+			);
+			let w1 = s.write(1);
+			let we = s.end(endError);
+
+			let forEachEndResult: Error = null;
+			let d = Promise.defer();
+			mapped.forEach(
+				(n) => { results.push(n); },
+				(e) => {
+					forEachEndResult = e;
+					return d.promise;
+				}
+			);
+
+			Promise.flush();
+			expect(mapEndResult).to.equal(endError);
+			expect(w1.isFulfilled()).to.equal(true);
+
+			expect(we.isPending()).to.equal(true);
+			expect(mapped.isEnding()).to.equal(true);
+			expect(mapped.isEnded()).to.equal(false);
+			expect(s.result().isPending()).to.equal(true);
+
+			d.resolve();
+			Promise.flush();
+			expect(results).to.deep.equal([2]);
+			expect(we.reason()).to.equal(boomError);
+			expect(mapped.isEnded()).to.equal(true);
+			expect(s.isEnded()).to.equal(true);
+			expect(s.result().reason()).to.equal(boomError);
+			expect(forEachEndResult).to.equal(endError);
 		});
 
 		it("supports aborter", () => {

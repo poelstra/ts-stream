@@ -42,9 +42,15 @@ function composeEnders(
 		// end(), so we have to close it somehow...
 		return Promise.resolve(error).then(ender).then(
 			() => defaultEnder(error),
-			(enderError) => {
-				defaultEnder(error || enderError);
-				return Promise.reject(enderError);
+			(enderError: Error) => {
+				// ender callback failed, but in order to let final stream fail,
+				// we need to pass 'something' on, and to wait for that to come
+				// back.
+				// Finally, make sure to return the enderError.
+				return Promise.resolve(defaultEnder(error || enderError)).then(
+					() => Promise.reject(enderError),
+					() => Promise.reject(enderError)
+				);
 			}
 		);
 	};
