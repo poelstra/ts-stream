@@ -264,7 +264,14 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 	 */
 	pipe(writable: Writable<T>): Writable<T>;
 
-	// TODO Experimental
+	/**
+	 * Return a new stream with the results of running the given
+	 * transform.
+	 *
+	 * @param transformer Function that receives this stream and result stream
+	 *                    as inputs.
+	 * @return Readable stream with the transformed results
+	 */
 	transform<R>(transformer: Transform<T, R>): ReadableStream<R>;
 }
 
@@ -721,7 +728,14 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		return writable;
 	}
 
-	// TODO Experimental
+	/**
+	 * Return a new stream with the results of running the given
+	 * transform.
+	 *
+	 * @param transformer Function that receives this stream and result stream
+	 *                    as inputs.
+	 * @return Readable stream with the transformed results
+	 */
 	transform<R>(transformer: Transform<T, R>): ReadableStream<R> {
 		let output = new Stream<R>();
 		transformer(this, output);
