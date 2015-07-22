@@ -832,16 +832,84 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * The stream is ended as soon as the first `undefined` value is
 	 * encountered.
 	 *
+	 * The array itself, and/or the values in the array may also be promises.
+	 *
 	 * @see result() to wait for completion
 	 * @see writeEach() for error handling behavior
 	 *
-	 * @param data Input array
-	 * @return Stream for all values in the input array
+	 * @param data (Promise for) input array of (promises for) values
+	 * @return Stream of all values in the input array
 	 */
-	static from<T>(data: T[]): ReadableStream<T> {
+	static from<T>(data: Thenable<Thenable<T>[]>): ReadableStream<T>;
+	/**
+	 * Return a Stream for all values in the input array.
+	 *
+	 * The stream is ended as soon as the first `undefined` value is
+	 * encountered.
+	 *
+	 * The array itself, and/or the values in the array may also be promises.
+	 *
+	 * @see result() to wait for completion
+	 * @see writeEach() for error handling behavior
+	 *
+	 * @param data (Promise for) input array of (promises for) values
+	 * @return Stream of all values in the input array
+	 */
+	static from<T>(data: Thenable<T>[]): ReadableStream<T>;
+	/**
+	 * Return a Stream for all values in the input array.
+	 *
+	 * The stream is ended as soon as the first `undefined` value is
+	 * encountered.
+	 *
+	 * The array itself, and/or the values in the array may also be promises.
+	 *
+	 * @see result() to wait for completion
+	 * @see writeEach() for error handling behavior
+	 *
+	 * @param data (Promise for) input array of (promises for) values
+	 * @return Stream of all values in the input array
+	 */
+	static from<T>(data: Thenable<T[]>): ReadableStream<T>;
+	/**
+	 * Return a Stream for all values in the input array.
+	 *
+	 * The stream is ended as soon as the first `undefined` value is
+	 * encountered.
+	 *
+	 * The array itself, and/or the values in the array may also be promises.
+	 *
+	 * @see result() to wait for completion
+	 * @see writeEach() for error handling behavior
+	 *
+	 * @param data (Promise for) input array of (promises for) values
+	 * @return Stream of all values in the input array
+	 */
+	static from<T>(data: T[]): ReadableStream<T>;
+	/**
+	 * Return a Stream for all values in the input array.
+	 *
+	 * The stream is ended as soon as the first `undefined` value is
+	 * encountered.
+	 *
+	 * The array itself, and/or the values in the array can also be promises.
+	 *
+	 * @see result() to wait for completion
+	 * @see writeEach() for error handling behavior
+	 *
+	 * @param data (Promise for) input array of (promises for) values
+	 * @return Stream of all values in the input array
+	 */
+	static from<T>(data: T[]|Thenable<T[]>|Thenable<T>[]|Thenable<Thenable<T>[]>): ReadableStream<T> {
 		let stream = new Stream<T>();
 		let i = 0;
-		stream.writeEach(() => data[i++]);
+		if (Array.isArray(data)) {
+			stream.writeEach(() => data[i++]);
+		} else {
+			Promise.resolve<T[]|Thenable<T>[]>(data).then((resolvedArray) => {
+				stream.writeEach(() => resolvedArray[i++]);
+			});
+		}
 		return stream;
 	}
 

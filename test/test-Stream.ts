@@ -1003,6 +1003,27 @@ describe("Stream", () => {
 			expect(results).to.deep.equal([1, 2]);
 		});
 
+		it("supports promise for array", () => {
+			let s = Stream.from(Promise.resolve([1, 2]));
+			s.forEach((v) => { results.push(v); });
+			Promise.flush();
+			expect(results).to.deep.equal([1, 2]);
+		});
+
+		it("supports array of promises", () => {
+			let s = Stream.from([Promise.resolve(1), Promise.resolve(2)]);
+			s.forEach((v) => { results.push(v); });
+			Promise.flush();
+			expect(results).to.deep.equal([1, 2]);
+		});
+
+		it("supports promise for array of promises", () => {
+			let s = Stream.from(Promise.resolve([Promise.resolve(1), Promise.resolve(2)]));
+			s.forEach((v) => { results.push(v); });
+			Promise.flush();
+			expect(results).to.deep.equal([1, 2]);
+		});
+
 		it("ends on first undefined", () => {
 			let s = Stream.from([1, 2, undefined, 3]);
 			s.forEach((v) => { results.push(v); });
@@ -1059,6 +1080,6 @@ describe("Stream", () => {
 			expect(s.isEnded()).to.equal(true);
 			expect(endResult).to.equal(abortError);
 			expect(result.reason()).to.equal(abortError);
-		})
+		});
 	}); // from()
 });
