@@ -404,6 +404,8 @@ describe("Stream", () => {
 		});
 
 		it("handles error in reader", () => {
+			// Error thrown in reader should ONLY reflect back to writer, not to reader
+			// Allows writer to decide to send another value, abort, end normally, etc.
 			var endError = new Error("end boom");
 			var endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
 			let res = s.forEach((n) => {
@@ -422,30 +424,6 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(endResult).to.equal(endError);
 			expect(ep.value()).to.equal(undefined);
-			expect(res.isFulfilled()).to.equal(true);
-		});
-
-		it("handles error thrown in reader", () => {
-			// Error thrown in reader should ONLY reflect back to writer, not to reader
-			// Allows writer to decide to send another value, abort, end normally, etc.
-			var writeError: Error;
-			var endResult: Error;
-			s.write(1).catch((e) => { writeError = e; });
-			let res = s.forEach((v) => { throw boomError }, (e) => { endResult = e; });
-			Promise.flush();
-			expect(writeError).to.equal(boomError);
-			expect(endResult).to.be.undefined;
-
-			// Try to end the stream with an error, this time it should only end up in
-			// ender (basically already covered by other tests, but just to make sure
-			// that internal state isn't corrupted)
-			writeError = undefined;
-			endResult = undefined;
-			let endBoom = new Error("end boom");
-			s.end(endBoom).catch((e) => { writeError = e; });
-			Promise.flush();
-			expect(writeError).to.be.undefined;
-			expect(endResult).to.equal(endBoom);
 			expect(res.isFulfilled()).to.equal(true);
 		});
 
