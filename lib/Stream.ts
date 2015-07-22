@@ -280,7 +280,28 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
  * .mappedBy() in addition to the basic requirements of a Writable interface.
  */
 export interface WritableStream<T> extends Writable<T>, CommonStream<T> {
-	// TODO Experimental
+	/**
+	 * Repeatedly call `writer` and write its returned value (or promise for it)
+	 * to the stream.
+	 * The stream is ended when `writer` returns `undefined`.
+	 *
+	 * `writer` is only called when its previously returned value has been
+	 * processed by the stream.
+	 *
+	 * If writing of a value fails (either by the callback throwing an error,
+	 * returning a rejection, or the write call failing), the stream is aborted
+	 * and ended with that error.
+	 *
+	 * If ending of the stream fails with an error other than the abort error,
+	 * the program is terminated with an UnhandledEndError.
+	 *
+	 * NOTE Whether stream is aborted on error is still subject to change.
+	 *
+	 * @param writer Called when the next value can be written to the stream,
+	 *               should return (a promise for) a value to be written,
+	 *               or `undefined` (or void promise) to end the stream.
+	 * @return Stream for all values in the input array
+	 */
 	writeEach(writer: () => T|Thenable<T>|void|Thenable<void>): Promise<void>;
 
 	// TODO Experimental
@@ -742,21 +763,51 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		return output;
 	}
 
-	// TODO Experimental
+	/**
+	 * Repeatedly call `writer` and write its returned value (or promise for it)
+	 * to the stream.
+	 * The stream is ended when `writer` returns `undefined`.
+	 *
+	 * `writer` is only called when its previously returned value has been
+	 * processed by the stream.
+	 *
+	 * If writing of a value fails (either by the callback throwing an error,
+	 * returning a rejection, or the write call failing), the stream is aborted
+	 * and ended with that error.
+	 *
+	 * If ending of the stream fails with an error other than the abort error,
+	 * the program is terminated with an UnhandledEndError.
+	 *
+	 * NOTE Whether stream is aborted on error is still subject to change.
+	 *
+	 * @param writer Called when the next value can be written to the stream,
+	 *               should return (a promise for) a value to be written,
+	 *               or `undefined` (or void promise) to end the stream.
+	 * @return Stream for all values in the input array
+	 */
 	writeEach(writer: () => T|Thenable<T>|void|Thenable<void>): Promise<void> {
-		// TODO Or `writer: (write, end) => ...`-style callback?
-		// TODO if write/end return an error, promise is rejected, but stream
-		// may still be open. Not ideal for an 'easy' helper like writeEach()
-		var loop = (): Promise<void> => {
-			return Promise.resolve<T|void>(writer()).then((v) => {
-				if (v === undefined) {
+		this.aborted().catch((abortError) => {
+			// Swallow errors from the end call, as they will be reflected in
+			// result() too
+			// TODO Make second arg to end() the default case
+			swallowErrors(this.end(abortError, Promise.reject(abortError)));
+		});
+		let loop = (): void|Promise<void> => {
+			if (this._abortPromise) {
+				// Don't call writer when aborted
+				return;
+			}
+			let valuePromise = writer();
+			return Promise.resolve<T|void>(valuePromise).then((value?: T) => {
+				if (value === undefined) {
 					return this.end();
 				} else {
-					return this.write(<T>v).then(loop);
+					return this.write(value).then(loop);
 				}
-			});
+			})
 		};
-		return loop();
+		Promise.resolve().then(loop).done(undefined, (error: Error) => this.abort(error));
+		return this.result();
 	}
 
 	// TODO Experimental
@@ -778,33 +829,19 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	/**
 	 * Return a Stream for all values in the input array.
 	 *
-	 * If a reader returns an error, the stream will be aborted with that error.
-	 * TODO: this behavior may be subject to change
+	 * The stream is ended as soon as the first `undefined` value is
+	 * encountered.
+	 *
+	 * @see result() to wait for completion
+	 * @see writeEach() for error handling behavior
 	 *
 	 * @param data Input array
 	 * @return Stream for all values in the input array
 	 */
 	static from<T>(data: T[]): ReadableStream<T> {
-		// TODO: consider rewriting to use .forEach()
 		let stream = new Stream<T>();
 		let i = 0;
-		let aborter = (error?: Error) => {
-			if (error) {
-				// TODO
-				// - Explode?
-				// - maybe only have `static into<T>(writable, data): Promise<void>`?
-				// - allow passing an end-callback?
-				// - expect people to listen for result()?
-				stream.abort(error);
-			}
-		};
-		let loop = () => {
-			if (i >= data.length) {
-				return stream.end().done(undefined, aborter);
-			}
-			stream.write(data[i++]).done(loop, aborter);
-		};
-		loop();
+		stream.writeEach(() => data[i++]);
 		return stream;
 	}
 

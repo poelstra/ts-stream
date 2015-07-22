@@ -882,4 +882,205 @@ describe("Stream", () => {
 			expect(s.aborted().reason()).to.equal(abortError);
 		});
 	}); // map()
+
+	describe("writeEach()", () => {
+		it("calls callback until undefined is returned", () => {
+			let values = [1, 2, undefined, 3];
+			let writeResult = s.writeEach(() => values.shift());
+			s.forEach((v) => { results.push(v); });
+			Promise.flush();
+			expect(s.isEnded()).to.equal(true);
+			expect(results).to.deep.equal([1, 2]);
+			expect(values).to.deep.equal([3]);
+			expect(writeResult.isFulfilled()).to.equal(true);
+		});
+
+		it("waits for next call until previous value is processed", () => {
+			let values = [1, 2];
+			let writeResult = s.writeEach(() => values.shift());
+			Promise.flush();
+			expect(values).to.deep.equal([2]);
+
+			s.forEach((v) => { results.push(v); });
+			Promise.flush();
+			expect(results).to.deep.equal([1, 2]);
+		});
+
+		it("handles synchronous exception in writer", () => {
+			let writeResult = s.writeEach(() => { throw boomError; });
+			s.forEach(noop);
+			Promise.flush();
+			expect(s.isEnded()).to.equal(true);
+			expect(writeResult.reason()).to.equal(boomError);
+		});
+
+		it("handles all values and stream end as promises", () => {
+			let values = [1, 2];
+			let writeResult = s.writeEach(() => Promise.resolve(values.shift()));
+			s.forEach((v) => { results.push(v); });
+			Promise.flush();
+			expect(results).to.deep.equal([1, 2]);
+			expect(writeResult.isFulfilled()).to.equal(true);
+		});
+
+		it("aborts and ends with error on write error", () => {
+			let values = [1, 2, 3];
+			let writeResult = s.writeEach(() => values.shift());
+			let endResult: Error = null;
+			let forEachResult = s.forEach(
+				(v) => {
+					if (v === 2) {
+						return Promise.reject(boomError);
+					}
+				},
+				(error?: Error) => { endResult = error; }
+			);
+			Promise.flush();
+			expect(values).to.deep.equal([3]);
+			expect(s.isEnded()).to.equal(true);
+			expect(s.aborted().reason()).to.equal(boomError);
+			expect(endResult).to.equal(boomError);
+			expect(forEachResult.reason()).to.equal(boomError);
+			expect(writeResult.reason()).to.equal(boomError);
+		});
+
+		it("aborts and ends with error on normal end error", () => {
+			let values = [1, 2];
+			let writeResult = s.writeEach(() => values.shift());
+			let forEachResult = s.forEach(
+				noop,
+				(error?: Error) => Promise.reject(boomError)
+			);
+			Promise.flush();
+			expect(values).to.deep.equal([]);
+			expect(s.isEnded()).to.equal(true);
+			expect(s.aborted().reason()).to.equal(boomError);
+			expect(forEachResult.reason()).to.equal(boomError);
+			expect(writeResult.reason()).to.equal(boomError);
+		});
+
+		it("ends with error on end error after abort", () => {
+			let values = [1, 2];
+			let writeResult = s.writeEach(() => values.shift());
+			s.abort(abortError);
+			let forEachResult = s.forEach(
+				noop,
+				(error?: Error) => Promise.reject(boomError)
+			);
+			Promise.flush();
+			expect(values).to.deep.equal([1, 2]);
+			expect(s.isEnded()).to.equal(true);
+			expect(s.aborted().reason()).to.equal(abortError);
+			expect(forEachResult.reason()).to.equal(boomError);
+			expect(writeResult.reason()).to.equal(boomError);
+		});
+
+		it("handles abort bounce", () => {
+			let values = [1, 2, 3];
+			let writeResult = s.writeEach(() => values.shift());
+			let forEachResult = s.forEach(
+				(v) => {
+					if (v === 2) {
+						return Promise.reject(boomError);
+					}
+				}
+				// Note: no end handler, so default, which 'bounces' the given
+				// error
+			);
+			Promise.flush();
+			expect(values).to.deep.equal([3]);
+			expect(s.isEnded()).to.equal(true);
+			expect(forEachResult.reason()).to.equal(boomError);
+			expect(writeResult.reason()).to.equal(boomError);
+		});
+
+		it("ends on abort", () => {
+			let values = [1, 2, 3];
+			let writeResult = s.writeEach(() => values.shift());
+			let endResult: Error = null;
+			let d = Promise.defer();
+			let forEachResult = s.forEach(
+				(v) => d.promise,
+				(err?) => { endResult = err; }
+			);
+			Promise.flush();
+			expect(values).to.deep.equal([2, 3]);
+			s.abort(abortError);
+			d.resolve();
+			Promise.flush();
+			expect(values).to.deep.equal([2, 3]);
+			expect(s.isEnded()).to.equal(true);
+			expect(endResult).to.equal(abortError);
+			expect(forEachResult.reason()).to.equal(abortError);
+			expect(writeResult.reason()).to.equal(abortError);
+		})
+	}); // writeEach()
+
+	describe("from()", () => {
+		it("produces all values, then ends", () => {
+			let s = Stream.from([1, 2]);
+			s.forEach((v) => { results.push(v); });
+			Promise.flush();
+			expect(s.isEnded()).to.equal(true);
+			expect(results).to.deep.equal([1, 2]);
+		});
+
+		it("ends on first undefined", () => {
+			let s = Stream.from([1, 2, undefined, 3]);
+			s.forEach((v) => { results.push(v); });
+			Promise.flush();
+			expect(s.isEnded()).to.equal(true);
+			expect(results).to.deep.equal([1, 2]);
+		});
+
+		it("aborts on write error", () => {
+			let s = Stream.from([1, 2]);
+			let endResult: Error = null;
+			let result = s.forEach(
+				(v) => {
+					if (v === 2) {
+						return Promise.reject(boomError);
+					}
+				},
+				(error?: Error) => { endResult = error; }
+			);
+			Promise.flush();
+			expect(s.isEnded()).to.equal(true);
+			expect(endResult).to.equal(boomError);
+			expect(result.reason()).to.equal(boomError);
+		});
+
+		it("handles abort bounce", () => {
+			let s = Stream.from([1, 2]);
+			let result = s.forEach(
+				(v) => {
+					if (v === 2) {
+						return Promise.reject(boomError);
+					}
+				}
+				// Note: no end handler, so default, which 'bounces' the given
+				// error
+			);
+			Promise.flush();
+			expect(s.isEnded()).to.equal(true);
+			expect(result.reason()).to.equal(boomError);
+		});
+
+		it("ends on abort", () => {
+			let s = Stream.from([1, 2]);
+			let endResult: Error = null;
+			let d = Promise.defer();
+			let result = s.forEach(
+				(v) => d.promise,
+				(err?) => { endResult = err; }
+			);
+			Promise.flush();
+			s.abort(abortError);
+			d.resolve();
+			Promise.flush();
+			expect(s.isEnded()).to.equal(true);
+			expect(endResult).to.equal(abortError);
+			expect(result.reason()).to.equal(abortError);
+		})
+	}); // from()
 });

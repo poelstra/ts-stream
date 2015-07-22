@@ -23,13 +23,7 @@ source.writeEach(() => {
 	return i++;
 }).then(
 	() => console.log("writeEach() ok"),
-	(err) => {
-		console.log("writeEach() error", err);
-		// Note: the stream may still be open, so explicitly abort
-		// See TODO in Stream.writeEach(): this behavior is likely going to
-		// change!
-		source.abort(err);
-	}
+	(err) => console.log("writeEach() error", err)
 );
 
 // Read values, delay 1 second before 'returning'
