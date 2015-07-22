@@ -305,6 +305,13 @@ items will be added to this list though...):
 
 # Changelog
 
+0.6.1 (2015-07-22):
+- All arguments of `Stream#map()` and `Stream#filter()` now also available on `ReadableStream` interface (#15)
+- `from()` ends stream on abort (#16)
+- `from()` can take a promise for an array (and array can contain promises) (#23)
+- Reimplemented `writeEach()` based on current abort/error practices
+- Documented `writeEach()` and `transform()`
+
 0.6.0 (2015-06-24):
 - Return `result()` from `forEach()` (#11)
 - Implement `isEnding()` and `isEndingOrEnded()` (#12)
