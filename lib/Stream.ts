@@ -199,6 +199,14 @@ export interface CommonStream<T> {
 	 * @return true when `end()` was called
 	 */
 	isEndingOrEnded(): boolean;
+
+	/**
+	 * Determine whether `forEach()` callback(s) are currently attached to the
+	 * stream.
+	 *
+	 * @return true when `forEach()` has been called on this stream
+	 */
+	hasReader(): boolean;
 }
 
 /**
@@ -675,6 +683,16 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 */
 	isEndingOrEnded(): boolean {
 		return this.isEnding() || this.isEnded();
+	}
+
+	/**
+	 * Determine whether `forEach()` callback(s) are currently attached to the
+	 * stream.
+	 *
+	 * @return true when `forEach()` has been called on this stream
+	 */
+	hasReader(): boolean {
+		return !!this._reader;
 	}
 
 	/**

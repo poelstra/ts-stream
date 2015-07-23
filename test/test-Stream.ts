@@ -549,7 +549,19 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(s.isEndingOrEnded()).to.equal(true);
 		});
-	}); // isEnding()
+	}); // isEndingOrEnded()
+
+	describe("hasReader()", () => {
+		it("indicates whether reader/ender are attached", () => {
+			expect(s.hasReader()).to.equal(false);
+			s.forEach(noop);
+			expect(s.hasReader()).to.equal(true);
+			s.end();
+			Promise.flush();
+			expect(s.isEnded()).to.equal(true);
+			expect(s.hasReader()).to.equal(true);
+		});
+	});
 
 	describe("result()", () => {
 		it("indicates stream end", () => {
