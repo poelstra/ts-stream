@@ -11,7 +11,7 @@
 require("source-map-support").install();
 
 import Promise from "ts-promise";
-import { Stream, ReadableStream, WriteAfterEndError, Transform } from "../lib/index";
+import { Stream, ReadableStream, WriteAfterEndError, AlreadyHaveReaderError, Transform } from "../lib/index";
 import { expect } from "chai";
 
 //Promise.setLongTraces(true);
@@ -454,13 +454,15 @@ describe("Stream", () => {
 
 		it("disallows multiple attach", () => {
 			s.forEach(noop);
-			expect(() => s.forEach(noop)).to.throw();
+			let result = s.forEach(noop);
+			expect(result.reason()).to.be.instanceof(AlreadyHaveReaderError);
 		});
 	}); // forEach()
 
 	describe("write()", () => {
 		it("disallows writing undefined", () => {
-			expect(() => s.write(undefined)).to.throw(TypeError, "void value");
+			let result = s.write(undefined);
+			expect(result.reason()).to.be.instanceof(TypeError);
 		});
 	}); // write()
 
@@ -479,7 +481,8 @@ describe("Stream", () => {
 		});
 		it("disallows non-error as error parameter", () => {
 			readInto(s, results);
-			expect(() => s.end(<any>"boom")).to.throw("invalid argument");
+			let result = s.end(<any>"boom");
+			expect(result.reason()).to.be.instanceof(TypeError);
 		});
 	}); // end()
 

@@ -322,11 +322,20 @@ export interface WritableStream<T> extends Writable<T>, CommonStream<T> {
 }
 
 /**
- * Thrown when writing to an already-ended stream.
+ * Used when writing to an already-ended stream.
  */
 export class WriteAfterEndError extends BaseError {
 	constructor() {
 		super("WriteAfterEndError", "stream already ended");
+	}
+}
+
+/**
+ * Used when read callback(s) have already been attached.
+ */
+export class AlreadyHaveReaderError extends BaseError {
+	constructor() {
+		super("AlreadyHaveReaderError", "stream already has a reader");
 	}
 }
 
@@ -485,7 +494,9 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			// useful to have a stream of void's, so let's prevent it for now.
 			// NOTE: This behaviour may change in the future
 			// TODO: prevent writing a void Thenable too?
-			throw new TypeError("cannot write void value, use end() to end the stream");
+			return Promise.reject(
+				new TypeError("cannot write void value, use end() to end the stream")
+			);
 		}
 
 		let valuePromise = Promise.resolve(value);
@@ -522,7 +533,9 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 */
 	end(error?: Error, endedResult?: Thenable<void>): Promise<void> {
 		if (!(error === undefined || error === null || error instanceof Error)) {
-			throw new TypeError("invalid argument to end(): must be undefined, null or Error object");
+			return Promise.reject(
+				new TypeError("invalid argument to end(): must be undefined, null or Error object")
+			);
 		}
 		let eof = new Eof(error, endedResult);
 		if (!this._ending && !this._ended) {
@@ -585,8 +598,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		ender?: (error?: Error) => void|Thenable<void>,
 		aborter?: (error: Error) => void
 	): Promise<void> {
-		if (this._reader) {
-			throw new Error("forEach() can only be called once per stream");
+		if (this.hasReader()) {
+			return Promise.reject(new AlreadyHaveReaderError());
 		}
 		if (!ender) {
 			ender = defaultEnder;
