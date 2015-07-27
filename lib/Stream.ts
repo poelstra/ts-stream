@@ -270,7 +270,7 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 	 * @param  writable Destination stream
 	 * @return The stream passed in, for easy chaining
 	 */
-	pipe(writable: Writable<T>): Writable<T>;
+	pipe<R extends Writable<T>>(writable: R): R;
 
 	/**
 	 * Return a new stream with the results of running the given
@@ -772,7 +772,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param  writable Destination stream
 	 * @return The stream passed in, for easy chaining
 	 */
-	pipe(writable: Writable<T>): Writable<T> {
+	pipe<R extends Writable<T>>(writable: R): R {
 		this.forEach(
 			(value: T) => writable.write(value),
 			(error?: Error) => writable.end(error)
