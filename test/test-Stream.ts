@@ -424,7 +424,7 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(endResult).to.equal(endError);
 			expect(ep.value()).to.equal(undefined);
-			expect(res.isFulfilled()).to.equal(true);
+			expect(res.reason()).to.equal(endError);
 		});
 
 		it("can use a default ender", () => {

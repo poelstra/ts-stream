@@ -158,15 +158,17 @@ export interface Writable<T> extends Common<T> {
 	 * `forEach()` before passing the end-of-stream to its end handler.
 	 *
 	 * The returned promise will resolve after the end handler has finished
-	 * processing. It is rejected if the read handler throws an error or returns
-	 * a rejected Thenable.
+	 * processing. It is rejected if the end handler throws an error or returns
+	 * a rejected promise.
 	 *
 	 * All calls to `write()` or `end()` after the first `end()` will be
 	 * rejected with a `WriteAfterEndError`.
 	 *
-	 * It is possible to let this stream's `result()` result 'wait' for any
-	 * upstream's `end()` call(s) to be finished by passing e.g. our direct
-	 * upstream's `result()` promise as the second argument.
+	 * By default, this stream's `result()` will be resolved when `end()`
+	 * resolves, or rejected with the error if `end()` is called with an error.
+	 * It is possible to let this stream's `result()` 'wait' until any upstream
+	 * streams have completed by e.g. passing that upstream's `result()` as the
+	 * second argument to `end()`.
 	 *
 	 * @param  error Optional Error to pass to `forEach()` end handler
 	 * @param  result Optional promise that determines final value of `result()`
@@ -507,18 +509,20 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * `forEach()` before passing the end-of-stream to its end handler.
 	 *
 	 * The returned promise will resolve after the end handler has finished
-	 * processing. It is rejected if the read handler throws an error or returns
-	 * a rejected Thenable.
+	 * processing. It is rejected if the end handler throws an error or returns
+	 * a rejected promise.
 	 *
 	 * All calls to `write()` or `end()` after the first `end()` will be
 	 * rejected with a `WriteAfterEndError`.
 	 *
-	 * It is possible to let this stream's `result()` result 'wait' for any
-	 * upstream's `end()` call(s) to be finished by passing e.g. our direct
-	 * upstream's `result()` promise as the second argument.
+	 * By default, this stream's `result()` will be resolved when `end()`
+	 * resolves, or rejected with the error if `end()` is called with an error.
+	 * It is possible to let this stream's `result()` 'wait' until any upstream
+	 * streams have completed by e.g. passing that upstream's `result()` as the
+	 * second argument to `end()`.
 	 *
 	 * @param  error Optional Error to pass to `forEach()` end handler
-	 * @param  endedResult Optional promise that determines final value of `result()`
+	 * @param  result Optional promise that determines final value of `result()`
 	 * @return Void-promise that resolves when end-handler has processed the
 	 *         end-of-stream
 	 */
@@ -527,6 +531,9 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			return Promise.reject(
 				new TypeError("invalid argument to end(): must be undefined, null or Error object")
 			);
+		}
+		if (error && !endedResult) {
+			endedResult = Promise.reject(error);
 		}
 		let eof = new Eof(error, endedResult);
 		if (!this._ending && !this._ended) {
@@ -811,8 +818,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		this.aborted().catch((abortError) => {
 			// Swallow errors from the end call, as they will be reflected in
 			// result() too
-			// TODO Make second arg to end() the default case
-			swallowErrors(this.end(abortError, Promise.reject(abortError)));
+			swallowErrors(this.end(abortError));
 		});
 		let loop = (): void|Promise<void> => {
 			if (this._abortPromise) {
