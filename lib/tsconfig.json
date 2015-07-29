@@ -21,6 +21,7 @@
         "./Stream.ts",
         "./Transform.ts",
         "./index.ts",
-        "./transformers.ts"
+        "./transformers.ts",
+        "./util.ts"
     ]
 }

@@ -12,6 +12,7 @@ import { Promise, Thenable, BaseError } from "ts-promise";
 import * as assert from "assert";
 
 import { Transform, map, filter } from "./Transform";
+import { swallowErrors, noop } from "./util";
 
 /**
  * Required methods for both readable and writable parts of a stream.
@@ -337,16 +338,6 @@ export class AlreadyHaveReaderError extends BaseError {
 	constructor() {
 		super("AlreadyHaveReaderError", "stream already has a reader");
 	}
-}
-
-function noop() { /* no-op */ }
-
-/**
- * Swallow any error that may result from this promise.
- * Used during e.g. `abort()`, to ignore potential errors.
- */
-function swallowErrors(promise: Promise<any>): void {
-	promise.done(noop, noop);
 }
 
 /**
