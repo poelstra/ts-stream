@@ -11,9 +11,10 @@
 "use strict";
 
 import * as NodeStream from "stream";
+import * as fs from "fs";
 import { Promise, Thenable, VoidDeferred } from "ts-promise";
 
-import { Readable } from "./Stream";
+import { Stream, Readable } from "./Stream";
 import { swallowErrors, noop } from "./util";
 
 /**
@@ -74,6 +75,38 @@ export class NodeReadable<T> extends NodeStream.Readable {
 			this._resumer();
 			this._resumer = undefined;
 		}
+	}
+}
+
+/**
+ * Convenience wrapper around Node's file stream.
+ *
+ * Usage example:
+ * let source = Stream.from(["abc", "def"]);
+ * source.pipe(new FileSink("test.txt"));
+ *
+ * To wait for the stream's result, use e.g.
+ * let sink = source.pipe(new FileSink("test.txt"));
+ * sink.result().then(() => console.log("ok"), (err) => console.log("error", err));
+ */
+export class FileSink extends Stream<string> {
+	/**
+	 * Construct writable ts-stream which writes all values to given file.
+	 * If the stream is ended with an error, the file is closed (and `result()`)
+	 * reflects that error.
+	 *
+	 * @see class description for usage example
+	 *
+	 * @param  path    Filename to wite to
+	 * @param  options Optional options (see https://nodejs.org/api/fs.html#fs_fs_createwritestream_path_options)
+	 */
+	constructor(path: string, options?: {
+		flags?: string;
+		encoding?: string;
+		string?: string;
+	}) {
+		super();
+		pipeToNodeStream(this, fs.createWriteStream(path, options));
 	}
 }
 
