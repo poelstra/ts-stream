@@ -354,6 +354,17 @@ items will be added to this list though...):
 
 # Changelog
 
+List of most notable changes for each release. For details, just see the commits
+between each version tag on GitHub.
+
+0.7.0 (2015-08-02):
+- Add `hasReader()`, indicates whether `forEach()` is attached (#20)
+- Return rejected promises instead of synchronously throwing
+- Add utilities for pumping ts-streams into Node streams (part of #17)
+- Add `FileSink` class for easy writing to a file
+- Implement `toArray()` and `reduce()` (#19)
+- Make stream's result be the error passed to `end()` by default, if any (#25)
+
 0.6.1 (2015-07-22):
 - All arguments of `Stream#map()` and `Stream#filter()` now also available on `ReadableStream` interface (#15)
 - `from()` ends stream on abort (#16)
