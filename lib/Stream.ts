@@ -267,6 +267,79 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 	): ReadableStream<T>;
 
 	/**
+	 * Reduce the stream into a single value by calling a reducer callback for
+	 * each value in the stream. Similar to `Array#reduce()`.
+	 *
+	 * The output of the previous call to `reducer` (aka `accumulator`) is given
+	 * as the first argument of the next call. For the first call, either the
+	 * `initial` value to `reduce()` is passed, or the first value of the stream
+	 * is used (and `current` will be the second value).
+	 *
+	 * The result of `reduce()` is a promise for the last value returned by
+	 * `reducer` (or the initial value, if there were no calls to `reducer`).
+	 * If no initial value could be determined, the result is rejected with a
+	 * TypeError.
+	 * If the stream is ended with an error, the result is rejected with that
+	 * error.
+	 *
+	 * It is possible for `reducer` to return a promise for its result.
+	 *
+	 * If the `reducer` throws an error or returns a rejected promise, the
+	 * originating `write()` will fail with that error.
+	 *
+	 * Examples:
+	 * s.reduce((acc, val) => acc + val); // sums all values
+	 * s.reduce((acc, val) => { acc.push(val); return acc; }, []); // toArray()
+	 *
+	 * @param  reducer Callback called for each value in the stream, with
+	 *                 accumulator, current value, index of current value, and
+	 *                 this stream.
+	 * @param  initial Optional initial value for accumulator. If no initial
+	 *                 value is given, first value of stream is used.
+	 * @return Promise for final accumulator.
+	 */
+	reduce(
+		reducer: (accumulator: T, current: T, index: number, stream: ReadableStream<T>) => T|Thenable<T>,
+		initial?: T
+	): Promise<T>;
+	/**
+	 * Reduce the stream into a single value by calling a reducer callback for
+	 * each value in the stream. Similar to `Array#reduce()`.
+	 *
+	 * The output of the previous call to `reducer` (aka `accumulator`) is given
+	 * as the first argument of the next call. For the first call, either the
+	 * `initial` value to `reduce()` is passed, or the first value of the stream
+	 * is used (and `current` will be the second value).
+	 *
+	 * The result of `reduce()` is a promise for the last value returned by
+	 * `reducer` (or the initial value, if there were no calls to `reducer`).
+	 * If no initial value could be determined, the result is rejected with a
+	 * TypeError.
+	 * If the stream is ended with an error, the result is rejected with that
+	 * error.
+	 *
+	 * It is possible for `reducer` to return a promise for its result.
+	 *
+	 * If the `reducer` throws an error or returns a rejected promise, the
+	 * originating `write()` will fail with that error.
+	 *
+	 * Examples:
+	 * s.reduce((acc, val) => acc + val); // sums all values
+	 * s.reduce((acc, val) => { acc.push(val); return acc; }, []); // toArray()
+	 *
+	 * @param  reducer Callback called for each value in the stream, with
+	 *                 accumulator, current value, index of current value, and
+	 *                 this stream.
+	 * @param  initial Optional initial value for accumulator. If no initial
+	 *                 value is given, first value of stream is used.
+	 * @return Promise for final accumulator.
+	 */
+	reduce<R>(
+		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => R|Thenable<R>,
+		initial: R
+	): Promise<R>;
+
+	/**
 	 * Read all values and end-of-stream from this stream, writing them to
 	 * `writable`.
 	 *
@@ -761,6 +834,136 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		let output = new Stream<T>();
 		filter(this, output, filterer, ender, aborter);
 		return output;
+	}
+
+	/**
+	 * Reduce the stream into a single value by calling a reducer callback for
+	 * each value in the stream. Similar to `Array#reduce()`.
+	 *
+	 * The output of the previous call to `reducer` (aka `accumulator`) is given
+	 * as the first argument of the next call. For the first call, either the
+	 * `initial` value to `reduce()` is passed, or the first value of the stream
+	 * is used (and `current` will be the second value).
+	 *
+	 * The result of `reduce()` is a promise for the last value returned by
+	 * `reducer` (or the initial value, if there were no calls to `reducer`).
+	 * If no initial value could be determined, the result is rejected with a
+	 * TypeError.
+	 * If the stream is ended with an error, the result is rejected with that
+	 * error.
+	 *
+	 * It is possible for `reducer` to return a promise for its result.
+	 *
+	 * If the `reducer` throws an error or returns a rejected promise, the
+	 * originating `write()` will fail with that error.
+	 *
+	 * Examples:
+	 * s.reduce((acc, val) => acc + val); // sums all values
+	 * s.reduce((acc, val) => { acc.push(val); return acc; }, []); // toArray()
+	 *
+	 * @param  reducer Callback called for each value in the stream, with
+	 *                 accumulator, current value, index of current value, and
+	 *                 this stream.
+	 * @param  initial Optional initial value for accumulator. If no initial
+	 *                 value is given, first value of stream is used.
+	 * @return Promise for final accumulator.
+	 */
+	reduce(
+		reducer: (accumulator: T, current: T, index: number, stream: ReadableStream<T>) => T|Thenable<T>,
+		initial?: T
+	): Promise<T>;
+	/**
+	 * Reduce the stream into a single value by calling a reducer callback for
+	 * each value in the stream. Similar to `Array#reduce()`.
+	 *
+	 * The output of the previous call to `reducer` (aka `accumulator`) is given
+	 * as the first argument of the next call. For the first call, either the
+	 * `initial` value to `reduce()` is passed, or the first value of the stream
+	 * is used (and `current` will be the second value).
+	 *
+	 * The result of `reduce()` is a promise for the last value returned by
+	 * `reducer` (or the initial value, if there were no calls to `reducer`).
+	 * If no initial value could be determined, the result is rejected with a
+	 * TypeError.
+	 * If the stream is ended with an error, the result is rejected with that
+	 * error.
+	 *
+	 * It is possible for `reducer` to return a promise for its result.
+	 *
+	 * If the `reducer` throws an error or returns a rejected promise, the
+	 * originating `write()` will fail with that error.
+	 *
+	 * Examples:
+	 * s.reduce((acc, val) => acc + val); // sums all values
+	 * s.reduce((acc, val) => { acc.push(val); return acc; }, []); // toArray()
+	 *
+	 * @param  reducer Callback called for each value in the stream, with
+	 *                 accumulator, current value, index of current value, and
+	 *                 this stream.
+	 * @param  initial Optional initial value for accumulator. If no initial
+	 *                 value is given, first value of stream is used.
+	 * @return Promise for final accumulator.
+	 */
+	reduce<R>(
+		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => R|Thenable<R>,
+		initial: R
+	): Promise<R>;
+	/**
+	 * Reduce the stream into a single value by calling a reducer callback for
+	 * each value in the stream. Similar to `Array#reduce()`.
+	 *
+	 * The output of the previous call to `reducer` (aka `accumulator`) is given
+	 * as the first argument of the next call. For the first call, either the
+	 * `initial` value to `reduce()` is passed, or the first value of the stream
+	 * is used (and `current` will be the second value).
+	 *
+	 * The result of `reduce()` is a promise for the last value returned by
+	 * `reducer` (or the initial value, if there were no calls to `reducer`).
+	 * If no initial value could be determined, the result is rejected with a
+	 * TypeError.
+	 * If the stream is ended with an error, the result is rejected with that
+	 * error.
+	 *
+	 * It is possible for `reducer` to return a promise for its result.
+	 *
+	 * If the `reducer` throws an error or returns a rejected promise, the
+	 * originating `write()` will fail with that error.
+	 *
+	 * Examples:
+	 * s.reduce((acc, val) => acc + val); // sums all values
+	 * s.reduce((acc, val) => { acc.push(val); return acc; }, []); // toArray()
+	 *
+	 * @param  reducer Callback called for each value in the stream, with
+	 *                 accumulator, current value, index of current value, and
+	 *                 this stream.
+	 * @param  initial Optional initial value for accumulator. If no initial
+	 *                 value is given, first value of stream is used.
+	 * @return Promise for final accumulator.
+	 */
+	reduce<R>(
+		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => R|Thenable<R>,
+		initial?: R
+	): Promise<R> {
+		let haveAccumulator = arguments.length === 2;
+		let accumulator: any = initial;
+		let index = 0;
+		return this.forEach(
+			(value: T): void|Thenable<void> => {
+				if (!haveAccumulator) {
+					accumulator = value;
+					haveAccumulator = true;
+					index++;
+				} else {
+					return Promise.resolve(reducer(accumulator, value, index++, this))
+						.then((newAccumulator: any) => accumulator = newAccumulator);
+				}
+			}
+		).then(() => {
+			if (!haveAccumulator) {
+				return Promise.reject<R>(new TypeError("cannot reduce() empty stream without initial value"));
+			}
+			return accumulator;
+		});
 	}
 
 	/**

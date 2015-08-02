@@ -876,6 +876,153 @@ describe("Stream", () => {
 		});
 	}); // map()
 
+	describe("reduce()", () => {
+		it("can be used to sum values", () => {
+			let s = Stream.from([1, 2, 3, 4]);
+			let result = s.reduce((a, b) => a + b);
+			Promise.flush();
+			expect(result.value()).to.equal(10);
+		});
+
+		it("can be used to sum values with seed", () => {
+			let s = Stream.from([1, 2, 3, 4]);
+			let result = s.reduce((a, b) => a + b, 10);
+			Promise.flush();
+			expect(result.value()).to.equal(20);
+		});
+
+		it("can be used to implement toArray()", () => {
+			let s = Stream.from([1, 2, 3, 4]);
+			let result = s.reduce(
+				(arr: number[], value: number) => { arr.push(value); return arr; },
+				[]
+			);
+			Promise.flush();
+			expect(result.value()).to.deep.equal([1, 2, 3, 4]);
+		});
+
+		it("calls reducer with same args as Array#reduce, without initial value", () => {
+			let arr = [1, 2, 3, 4];
+			let calls: any[][];
+			let previouses: number[];
+			function reducer(...args: any[]): number {
+				// Skip the last arg though (either the array or stream)
+				calls.push(args.slice(0, 3));
+				return previouses.shift();
+			}
+
+			calls = [];
+			previouses = [-10, -20, -30];
+			let arrResult = arr.reduce(reducer);
+			let arrCalls = calls;
+			expect(previouses).to.deep.equal([]);
+
+			calls = [];
+			previouses = [-10, -20, -30];
+			let s = Stream.from(arr);
+			let result = s.reduce(reducer);
+			Promise.flush();
+
+			expect(result.value()).to.equal(arrResult);
+			expect(previouses).to.deep.equal([]);
+			expect(calls).to.deep.equal(arrCalls);
+		});
+
+		it("calls reducer with same args as Array#reduce, with initial value", () => {
+			let arr = [1, 2, 3, 4];
+			let calls: any[][];
+			let previouses: number[];
+			function reducer(...args: any[]): number {
+				// Skip the last arg though (either the array or stream)
+				calls.push(args.slice(0, 3));
+				return previouses.shift();
+			}
+
+			calls = [];
+			previouses = [-20, -30, -40, -50];
+			let arrResult = arr.reduce(reducer, -10);
+			let arrCalls = calls;
+			expect(previouses).to.deep.equal([]);
+
+			calls = [];
+			previouses = [-20, -30, -40, -50];
+			let s = Stream.from(arr);
+			let result = s.reduce(reducer, -10);
+			Promise.flush();
+
+			expect(result.value()).to.equal(arrResult);
+			expect(previouses).to.deep.equal([]);
+			expect(calls).to.deep.equal(arrCalls);
+		});
+
+		it("calls reducer with stream as 4th arg, without initial value", () => {
+			let s = Stream.from([1, 2, 3, 4]);
+			let calls: any[][] = [];
+			let previouses = [-1, -2, -3];
+			function reducer(...args: any[]): number {
+				calls.push(args);
+				return previouses.shift();
+			}
+			let result = s.reduce(reducer);
+			Promise.flush();
+			expect(result.value()).to.equal(-3);
+			expect(previouses).to.deep.equal([]);
+			expect(calls).to.deep.equal([
+				[1, 2, 1, s],
+				[-1, 3, 2, s],
+				[-2, 4, 3, s]
+			]);
+		});
+
+		it("accepts promise from reducer", () => {
+			let d = Promise.defer<number>();
+			let reduceResult = s.reduce(() => d.promise, 0);
+
+			let writeResult = s.write(1);
+			Promise.flush();
+			expect(reduceResult.isPending()).to.equal(true);
+			expect(writeResult.isPending()).to.equal(true);
+
+			d.resolve(100);
+			Promise.flush();
+			expect(reduceResult.isPending()).to.equal(true);
+			expect(writeResult.isFulfilled()).to.equal(true);
+
+			s.end();
+			Promise.flush();
+			expect(reduceResult.value()).to.equal(100);
+		});
+
+		it("returns error when stream is empty without initial value", () => {
+			let reduceResult = s.reduce(() => 0);
+			s.end();
+			Promise.flush();
+			expect(reduceResult.reason()).to.be.instanceof(TypeError);
+		});
+
+		it("returns thrown error to writer", () => {
+			let reduceResult = s.reduce((prev, curr): number => { throw boomError; }, 0);
+			let writeResult = s.write(1);
+			Promise.flush();
+			expect(reduceResult.isPending()).to.equal(true);
+			expect(writeResult.reason()).to.equal(boomError);
+			s.end();
+			Promise.flush();
+			expect(reduceResult.isFulfilled()).to.equal(true);
+		});
+
+		it("returns rejected error to writer", () => {
+			let reduceResult = s.reduce((prev, curr) => Promise.reject<number>(boomError), 0);
+			let writeResult = s.write(1);
+			Promise.flush();
+			expect(reduceResult.isPending()).to.equal(true);
+			expect(writeResult.reason()).to.equal(boomError);
+			s.end();
+			Promise.flush();
+			expect(reduceResult.isFulfilled()).to.equal(true);
+		});
+	}); // reduce()
+
 	describe("writeEach()", () => {
 		it("calls callback until undefined is returned", () => {
 			let values = [1, 2, undefined, 3];
