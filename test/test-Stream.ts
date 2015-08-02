@@ -1023,6 +1023,27 @@ describe("Stream", () => {
 		});
 	}); // reduce()
 
+	describe("toArray()", () => {
+		it("returns all values in the stream", () => {
+			let result = Stream.from([1, 2, 3, 4]).toArray();
+			Promise.flush();
+			expect(result.value()).to.deep.equal([1, 2, 3, 4]);
+		});
+
+		it("returns empty array for empty stream", () => {
+			let result = Stream.from([]).toArray();
+			Promise.flush();
+			expect(result.value()).to.deep.equal([]);
+		});
+
+		it("returns end error if stream ended with error", () => {
+			let result = s.toArray();
+			s.end(boomError);
+			Promise.flush();
+			expect(result.reason()).to.deep.equal(boomError);
+		});
+	}) // toArray()
+
 	describe("writeEach()", () => {
 		it("calls callback until undefined is returned", () => {
 			let values = [1, 2, undefined, 3];

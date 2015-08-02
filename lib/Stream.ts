@@ -340,6 +340,16 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 	): Promise<R>;
 
 	/**
+	 * Read all stream values into an array.
+	 *
+	 * Returns a promise that resolves to that array if the stream ends
+	 * normally, or to the error if the stream is ended with an error.
+	 *
+	 * @return Promise for an array of all stream values
+	 */
+	toArray(): Promise<T[]>;
+
+	/**
 	 * Read all values and end-of-stream from this stream, writing them to
 	 * `writable`.
 	 *
@@ -964,6 +974,20 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			}
 			return accumulator;
 		});
+	}
+
+	/**
+	 * Read all stream values into an array.
+	 *
+	 * Returns a promise that resolves to that array if the stream ends
+	 * normally, or to the error if the stream is ended with an error.
+	 *
+	 * @return Promise for an array of all stream values
+	 */
+	toArray(): Promise<T[]> {
+		let result: T[] = [];
+		return this.forEach((value: T) => { result.push(value); })
+			.return(result);
 	}
 
 	/**
