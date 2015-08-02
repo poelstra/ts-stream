@@ -771,9 +771,11 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @return The stream passed in, for easy chaining
 	 */
 	pipe<R extends Writable<T>>(writable: R): R {
+		writable.aborted().catch((err) => this.abort(err));
+		this.aborted().catch((err) => writable.abort(err));
 		this.forEach(
 			(value: T) => writable.write(value),
-			(error?: Error) => writable.end(error)
+			(error?: Error) => writable.end(error, this.result())
 		);
 		return writable;
 	}
