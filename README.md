@@ -56,7 +56,7 @@ compliant library or native Promises, if available.
 
 Hello world example:
 ```ts
-Stream.from([1,2,3,4])
+Stream.from([1, 2, 3, 4])
 	.map((n) => n * 2)
 	.forEach((n) => console.log(n));
 // 2, 4, 6, 8
@@ -69,13 +69,28 @@ instead of the value itself. This will automatically 'block' the corresponding
 write.
 
 ```ts
-Stream.from([1,2,3,4])
+Stream.from([1, 2, 3, 4])
 	.map((n) => Promise.resolve(n * 2).delay(1000))
 	.forEach((n) => console.log(n));
 // 2, 4, 6, 8 (with pauses of a second)
 ```
 
 See later examples for more detailed info.
+
+## Reading all values into an array
+
+Although you'll typically use `forEach()`, `reduce()`, etc. to process values of
+a stream as they come in, getting all values in an array can come in handy:
+
+```
+Stream.from([1, 2, 3, 4])
+    .toArray()
+    .then((result) => console.log(result));
+// [1, 2, 3, 4]
+```
+
+Naturally, if the stream ends with an error, the result of `toArray()` is
+also rejected with that error.
 
 ## Handling a stream end
 
@@ -87,7 +102,7 @@ All pending writes will be processed before the end-of-stream callback is called
 (even if it is an error). To abort all pending operations, call `abort()`.
 
 ```ts
-Stream.from([1,2,3,4])
+Stream.from([1, 2, 3, 4])
 	.forEach(
 		(n) => console.log(n),
 		(err) => console.log("end", err || "ok")
@@ -160,6 +175,41 @@ write done
 Note how each write waits before the read is finished. This also works when the
 read is asynchronous (try it yourself: return `Promise.delay(1000)` in the
 forEach callbacks and see how the writes are delayed too).
+
+## Simpler way of writing to a stream
+
+Although `write()` and `end()` are very flexible, writing your own source can
+be much simpler by using `writeEach()`:
+
+```ts
+let values = [1, 2, 3, 4];
+var source = new Stream<number>();
+s.writeEach(() => values.shift());
+
+s.toArray().then(console.log); // [1, 2, 3, 4]
+```
+
+Note how `writeEach()` repeatedly calls the callback, until it returns
+`undefined`. Of course, it's also possible to return a promise.
+
+## Writing to a file
+
+Writing to a file is as simple as:
+
+```ts
+let source = Stream.from(["abc", "def"]);
+source.pipe(new FileSink("test.txt"));
+```
+
+To wait for the stream's result, use e.g.
+
+```ts
+let sink = source.pipe(new FileSink("test.txt"));
+sink.result().then(
+    () => console.log("ok"),
+    (err) => console.log("error", err)
+);
+```
 
 ## Error propagation
 
@@ -255,9 +305,8 @@ The API is not stable yet, but the examples should give a good feel for what it
 will look like. Experiments are being performed to model certain real-world
 scenarios, fine-tuning the API as we go.
 
-There's some tricky corner cases with regards to handling of errors in the
-face of e.g. `abort()`. Various TODO's are sprinkled through the code with ideas
-to handle such cases.
+Especially details around `abort()` are not finalized (see e.g. #24).
+A number of TODO's in the code need some love.
 A number of methods are still marked as experimental (and basically undocumented
 nor unit-tested). They need to be refined (probably by making a few examples
 with them) or removed.

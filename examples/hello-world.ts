@@ -12,6 +12,7 @@ import Stream from "../lib/index";
 
 Stream.from([1,2,3,4])
 	.map((n) => n * 2)
-	.forEach((n) => console.log(n));
+	.toArray()
+	.then((values) => console.log(values));
 
-// 2, 4, 6, 8
+// [2, 4, 6, 8]
