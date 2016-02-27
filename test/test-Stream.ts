@@ -6,35 +6,37 @@
  * License: MIT
  */
 
+/* tslint:disable:no-null-keyword */ // we use a lot of speficic null-checks below
+
 "use strict";
 
-require("source-map-support").install();
+import "source-map-support/register";
 
 import Promise from "ts-promise";
 import { Stream, ReadableStream, WriteAfterEndError, AlreadyHaveReaderError, Transform } from "../lib/index";
 import { expect } from "chai";
 
-//Promise.setLongTraces(true);
-
 function readInto<T>(stream: ReadableStream<T>, into: T[]): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
 		stream.forEach(
-			function(value: T) {
+			(value: T) => {
 				expect(this).to.equal(undefined);
 				into.push(value);
 			},
-			function(err?: Error) {
+			(err?: Error) => {
 				expect(this).to.equal(undefined);
-				if (err)
+				if (err) {
 					reject(err);
-				else
+				} else {
 					resolve(undefined);
+				}
 			}
 		);
 	});
 }
 
 function noop(): void {
+	/* empty */
 }
 
 function identity<T>(arg: T): T {
@@ -292,6 +294,11 @@ describe("Stream", () => {
 
 			Promise.flush();
 			expect(abortResult).to.equal(abortError);
+			expect(w1.isPending()).to.equal(true);
+
+			r1.resolve();
+			Promise.flush();
+			expect(w1.isFulfilled()).to.equal(true);
 		});
 		it("asynchronously calls aborter when not currently reading", () => {
 			let abortResult: Error = null;
@@ -308,6 +315,7 @@ describe("Stream", () => {
 
 			Promise.flush();
 			expect(abortResult).to.equal(abortError);
+			expect(w1.isFulfilled()).to.equal(true);
 		});
 		it("asynchronously calls aborter when attaching late", () => {
 			let w1 = s.write(1);
@@ -328,7 +336,7 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(abortResult).to.equal(abortError);
 		});
-		it("no longer calls aborter ender finished", () => {
+		it("no longer calls aborter when ender finished", () => {
 			let w1 = s.write(1);
 			let we = s.end();
 			let abortResult: Error = null;
@@ -341,6 +349,8 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(abortResult).to.equal(null);
 			expect(s.isEnded()).to.equal(true);
+			expect(w1.isFulfilled()).to.equal(true);
+			expect(we.isFulfilled()).to.equal(true);
 
 			s.abort(abortError);
 
@@ -408,9 +418,10 @@ describe("Stream", () => {
 			// Allows writer to decide to send another value, abort, end normally, etc.
 			var endError = new Error("end boom");
 			var endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
-			let res = s.forEach((n) => {
-				throw boomError;
-			}, (e?: Error) => { endResult = e; });
+			let res = s.forEach(
+				(n) => { throw boomError; },
+				(e?: Error) => { endResult = e; }
+			);
 
 			// Write a value, will be rejected by reader and returned from write
 			var wp = s.write(1);
@@ -878,22 +889,22 @@ describe("Stream", () => {
 
 	describe("reduce()", () => {
 		it("can be used to sum values", () => {
-			let s = Stream.from([1, 2, 3, 4]);
-			let result = s.reduce((a, b) => a + b);
+			let x = Stream.from([1, 2, 3, 4]);
+			let result = x.reduce((a, b) => a + b);
 			Promise.flush();
 			expect(result.value()).to.equal(10);
 		});
 
 		it("can be used to sum values with seed", () => {
-			let s = Stream.from([1, 2, 3, 4]);
-			let result = s.reduce((a, b) => a + b, 10);
+			let x = Stream.from([1, 2, 3, 4]);
+			let result = x.reduce((a, b) => a + b, 10);
 			Promise.flush();
 			expect(result.value()).to.equal(20);
 		});
 
 		it("can be used to implement toArray()", () => {
-			let s = Stream.from([1, 2, 3, 4]);
-			let result = s.reduce(
+			let x = Stream.from([1, 2, 3, 4]);
+			let result = x.reduce(
 				(arr: number[], value: number) => { arr.push(value); return arr; },
 				[]
 			);
@@ -919,8 +930,8 @@ describe("Stream", () => {
 
 			calls = [];
 			previouses = [-10, -20, -30];
-			let s = Stream.from(arr);
-			let result = s.reduce(reducer);
+			let x = Stream.from(arr);
+			let result = x.reduce(reducer);
 			Promise.flush();
 
 			expect(result.value()).to.equal(arrResult);
@@ -946,8 +957,8 @@ describe("Stream", () => {
 
 			calls = [];
 			previouses = [-20, -30, -40, -50];
-			let s = Stream.from(arr);
-			let result = s.reduce(reducer, -10);
+			let x = Stream.from(arr);
+			let result = x.reduce(reducer, -10);
 			Promise.flush();
 
 			expect(result.value()).to.equal(arrResult);
@@ -956,21 +967,21 @@ describe("Stream", () => {
 		});
 
 		it("calls reducer with stream as 4th arg, without initial value", () => {
-			let s = Stream.from([1, 2, 3, 4]);
+			let x = Stream.from([1, 2, 3, 4]);
 			let calls: any[][] = [];
 			let previouses = [-1, -2, -3];
 			function reducer(...args: any[]): number {
 				calls.push(args);
 				return previouses.shift();
 			}
-			let result = s.reduce(reducer);
+			let result = x.reduce(reducer);
 			Promise.flush();
 			expect(result.value()).to.equal(-3);
 			expect(previouses).to.deep.equal([]);
 			expect(calls).to.deep.equal([
-				[1, 2, 1, s],
-				[-1, 3, 2, s],
-				[-2, 4, 3, s]
+				[1, 2, 1, x],
+				[-1, 3, 2, x],
+				[-2, 4, 3, x],
 			]);
 		});
 
@@ -1042,7 +1053,7 @@ describe("Stream", () => {
 			Promise.flush();
 			expect(result.reason()).to.deep.equal(boomError);
 		});
-	}) // toArray()
+	}); // toArray()
 
 	describe("writeEach()", () => {
 		it("calls callback until undefined is returned", () => {
@@ -1065,6 +1076,7 @@ describe("Stream", () => {
 			s.forEach((v) => { results.push(v); });
 			Promise.flush();
 			expect(results).to.deep.equal([1, 2]);
+			expect(writeResult.isFulfilled()).to.equal(true);
 		});
 
 		it("handles synchronous exception in writer", () => {
@@ -1174,51 +1186,51 @@ describe("Stream", () => {
 			expect(endResult).to.equal(abortError);
 			expect(forEachResult.reason()).to.equal(abortError);
 			expect(writeResult.reason()).to.equal(abortError);
-		})
+		});
 	}); // writeEach()
 
 	describe("from()", () => {
 		it("produces all values, then ends", () => {
-			let s = Stream.from([1, 2]);
-			s.forEach((v) => { results.push(v); });
+			let x = Stream.from([1, 2]);
+			x.forEach((v) => { results.push(v); });
 			Promise.flush();
-			expect(s.isEnded()).to.equal(true);
+			expect(x.isEnded()).to.equal(true);
 			expect(results).to.deep.equal([1, 2]);
 		});
 
 		it("supports promise for array", () => {
-			let s = Stream.from(Promise.resolve([1, 2]));
-			s.forEach((v) => { results.push(v); });
+			let x = Stream.from(Promise.resolve([1, 2]));
+			x.forEach((v) => { results.push(v); });
 			Promise.flush();
 			expect(results).to.deep.equal([1, 2]);
 		});
 
 		it("supports array of promises", () => {
-			let s = Stream.from([Promise.resolve(1), Promise.resolve(2)]);
-			s.forEach((v) => { results.push(v); });
+			let x = Stream.from([Promise.resolve(1), Promise.resolve(2)]);
+			x.forEach((v) => { results.push(v); });
 			Promise.flush();
 			expect(results).to.deep.equal([1, 2]);
 		});
 
 		it("supports promise for array of promises", () => {
-			let s = Stream.from(Promise.resolve([Promise.resolve(1), Promise.resolve(2)]));
-			s.forEach((v) => { results.push(v); });
+			let x = Stream.from(Promise.resolve([Promise.resolve(1), Promise.resolve(2)]));
+			x.forEach((v) => { results.push(v); });
 			Promise.flush();
 			expect(results).to.deep.equal([1, 2]);
 		});
 
 		it("ends on first undefined", () => {
-			let s = Stream.from([1, 2, undefined, 3]);
-			s.forEach((v) => { results.push(v); });
+			let x = Stream.from([1, 2, undefined, 3]);
+			x.forEach((v) => { results.push(v); });
 			Promise.flush();
-			expect(s.isEnded()).to.equal(true);
+			expect(x.isEnded()).to.equal(true);
 			expect(results).to.deep.equal([1, 2]);
 		});
 
 		it("aborts on write error", () => {
-			let s = Stream.from([1, 2]);
+			let x = Stream.from([1, 2]);
 			let endResult: Error = null;
-			let result = s.forEach(
+			let result = x.forEach(
 				(v) => {
 					if (v === 2) {
 						return Promise.reject(boomError);
@@ -1227,14 +1239,14 @@ describe("Stream", () => {
 				(error?: Error) => { endResult = error; }
 			);
 			Promise.flush();
-			expect(s.isEnded()).to.equal(true);
+			expect(x.isEnded()).to.equal(true);
 			expect(endResult).to.equal(boomError);
 			expect(result.reason()).to.equal(boomError);
 		});
 
 		it("handles abort bounce", () => {
-			let s = Stream.from([1, 2]);
-			let result = s.forEach(
+			let x = Stream.from([1, 2]);
+			let result = x.forEach(
 				(v) => {
 					if (v === 2) {
 						return Promise.reject(boomError);
@@ -1244,23 +1256,23 @@ describe("Stream", () => {
 				// error
 			);
 			Promise.flush();
-			expect(s.isEnded()).to.equal(true);
+			expect(x.isEnded()).to.equal(true);
 			expect(result.reason()).to.equal(boomError);
 		});
 
 		it("ends on abort", () => {
-			let s = Stream.from([1, 2]);
+			let x = Stream.from([1, 2]);
 			let endResult: Error = null;
 			let d = Promise.defer();
-			let result = s.forEach(
+			let result = x.forEach(
 				(v) => d.promise,
 				(err?) => { endResult = err; }
 			);
 			Promise.flush();
-			s.abort(abortError);
+			x.abort(abortError);
 			d.resolve();
 			Promise.flush();
-			expect(s.isEnded()).to.equal(true);
+			expect(x.isEnded()).to.equal(true);
 			expect(endResult).to.equal(abortError);
 			expect(result.reason()).to.equal(abortError);
 		});

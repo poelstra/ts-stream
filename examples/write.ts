@@ -19,7 +19,7 @@ p = p.then(() => { console.log("write", i); return source.write(i++); });
 p = p.then(() => { console.log("write", i); return source.write(i++); });
 p.then(
 	() => {
-		console.log("write end")
+		console.log("write end");
 		return source.end();
 	},
 	(err) => {

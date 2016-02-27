@@ -10,7 +10,7 @@
 
 import Stream from "../lib/index";
 
-Stream.from([1,2,3,4])
+Stream.from([1, 2, 3, 4])
 	.map((n) => n * 2)
 	.toArray()
 	.then((values) => console.log(values));

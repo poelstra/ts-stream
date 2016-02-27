@@ -4,10 +4,11 @@
   "description": "Type-safe object streams with seamless support for backpressure, ending, and error handling",
   "main": "lib/index.js",
   "scripts": {
-    "test": "npm run build && mocha test/test-*.js",
+    "test": "npm run lint && npm run build && mocha test/test-*.js",
     "cover": "npm run build && istanbul cover _mocha -- test/test-*.js",
     "prepublish": "npm run test",
-    "build": "tsc -p lib/ && tsc -p test/ && tsc -p examples"
+    "build": "tsc -p lib/ && tsc -p test/ && tsc -p examples",
+    "lint": "tslint -t verbose {src,test,examples}/**/*.ts"
   },
   "repository": {
     "type": "git",
@@ -34,7 +35,8 @@
     "coveralls": "^2.11.2",
     "istanbul": "^0.3.14",
     "mocha": "^2.2.5",
-    "source-map-support": "^0.2.10",
+    "source-map-support": "^0.4.0",
+    "tslint": "^3.5.0",
     "typescript": "1.8.2"
   }
 }
