@@ -7,7 +7,7 @@
     "test": "npm run build && mocha test/test-*.js",
     "cover": "npm run build && istanbul cover _mocha -- test/test-*.js",
     "prepublish": "npm run test",
-    "build": "tsc -p lib/ && tsc -p test/ && tsc -p examples && dts-generator --name ts-stream --baseDir lib --out ts-stream.d.ts lib/index.ts --main ts-stream/index --es6 --es6default --extern ./node_modules/ts-promise/dist/ts-promise.d.ts"
+    "build": "tsc -p lib/ && tsc -p test/ && tsc -p examples"
   },
   "repository": {
     "type": "git",
@@ -26,18 +26,15 @@
   },
   "homepage": "https://github.com/poelstra/ts-stream#readme",
   "dependencies": {
-    "ts-promise": "^0.2.1"
+    "ts-promise": "^0.3.0"
   },
-  "typescript": {
-    "definition": "./ts-stream.d.ts"
-  },
+  "typings": "./lib/index.d.ts",
   "devDependencies": {
     "chai": "^2.3.0",
     "coveralls": "^2.11.2",
-    "dts-generator": "poelstra/dts-generator#6c96dfba98a467d76071fa67666474f760dab64f",
     "istanbul": "^0.3.14",
     "mocha": "^2.2.5",
     "source-map-support": "^0.2.10",
-    "typescript": "^1.5.0-beta"
+    "typescript": "1.8.2"
   }
 }

@@ -1,5 +1,5 @@
 {
-    "version": "1.5.0-alpha",
+    "version": "1.8.2",
     "compilerOptions": {
         "target": "es5",
         "module": "commonjs",
@@ -9,15 +9,19 @@
         "sourceMap": true,
         "noLib": false,
         "preserveConstEnums": true,
-        "suppressImplicitAnyIndexErrors": true
+        "suppressImplicitAnyIndexErrors": true,
+        "moduleResolution": "node"
     },
     "filesGlob": [
         "../typings/tsd-dev.d.ts",
-        "./**/*.ts",
-        "!./**/*.d.ts"
+        "**/*.ts",
+        "!**/*.d.ts"
     ],
     "files": [
         "../typings/tsd-dev.d.ts",
-        "./test-Stream.ts"
-    ]
+        "test-Stream.ts"
+    ],
+    "atom": {
+        "rewriteTsconfig": true
+    }
 }
