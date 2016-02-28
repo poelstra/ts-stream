@@ -14,7 +14,7 @@ Features:
 - Support for stream aborting
 - Support for EOF (with or without error)
 - Long stack trace support for errors thrown downstream (i.e. know which
-  transform threw an error, and where that value came from)
+  transform threw an error, and where that value came from) through ts-promise
 
 # Usage and examples
 
@@ -25,7 +25,7 @@ If you see e.g. `new Stream<number>()`, that's Typescript notation to indicate
 we're creating a stream of numbers. Simply use `new Stream()` in 'plain' JS
 instead.
 
-These examples can also be found in the `examples/` folder on GitHub.
+These and other examples can also be found in the `examples/` folder on GitHub.
 
 ## Installation
 
@@ -42,15 +42,11 @@ import Stream from "ts-stream"; // ES6 style
 var Stream = require("ts-stream").Stream; // CommonJS style
 ```
 
-If you're programming in TypeScript, you may need to add the following line to your project:
-```ts
-/// <reference path="./node_modules/ts-stream/ts-stream.d.ts" />
-```
-
-Note: browser support (through browserify) is untested, and may or may not work.
+If you use TypeScript, use `"moduleResolution": "node"` in your `tsconfig.json`
+to let it automatically pick up the typings of this package.
 
 Some examples below use Promises, for which you can use any Promises/A+
-compliant library or native Promises, if available.
+compliant library, or native Promises if available.
 
 ## Simple mapping transform
 
@@ -126,55 +122,9 @@ source.forEach((n) => console.log(n));
 // 1, 2
 ```
 
-## Writing to stream with error handling and backpressure
-
-The previous example did not have any error handling, and wrote all values to
-the stream at once.
-
-Because `write()` returns a promise, it's very easy to handle backpressure,
-and catch any errors:
-
-```ts
-var source = new Stream<number>();
-var p = Promise.resolve();
-var i = 0;
-p = p.then(() => { console.log("write", i); return source.write(i++); });
-p = p.then(() => { console.log("write", i); return source.write(i++); });
-p = p.then(() => { console.log("write", i); return source.write(i++); });
-p.then(
-	() => {
-		console.log("write end")
-		return source.end();
-	},
-	(err) => {
-		console.log("write failed", err);
-		return source.end(err);
-	}
-)
-.done(
-	() => console.log("write end ok"),
-	(err) => console.log("write end failed", err)
-);
-
-source.forEach((n) => console.log("read", n), (err) => console.log("read end", err || "ok"));
-```
-
-Output:
-```
-write 0
-read 0
-write 1
-read 1
-write 2
-read 2
-write end
-read end ok
-write done
-```
-
-Note how each write waits before the read is finished. This also works when the
-read is asynchronous (try it yourself: return `Promise.delay(1000)` in the
-forEach callbacks and see how the writes are delayed too).
+Each call to `write()` returns a promise that resolves when the value has been
+processed by the next element in the stream. Similarly, `end()` returns a
+promise that resolves when the end-of-stream has been processed.
 
 ## Simpler way of writing to a stream
 
@@ -183,10 +133,10 @@ be much simpler by using `writeEach()`:
 
 ```ts
 let values = [1, 2, 3, 4];
-var source = new Stream<number>();
-s.writeEach(() => values.shift());
+let source = new Stream<number>();
+source.writeEach(() => values.shift());
 
-s.toArray().then(console.log); // [1, 2, 3, 4]
+source.toArray().then(console.log); // [1, 2, 3, 4]
 ```
 
 Note how `writeEach()` repeatedly calls the callback, until it returns
@@ -282,8 +232,32 @@ read end [Error: oops]
 write end ok
 ```
 
+# Implementing your own transforms and endpoints
+
+Remember that many transforms can be simplified to a combination of the existing
+`map()`, `filter()` and `reduce()` transforms.
+
+Nevertheless, writing your own transforms (e.g. adapters to other types of
+streams) is not much more than using `forEach()`, `writeEach()` or explicit
+`write()`/`end()` calls.
+
+See the source of `lib/Transform.ts` and `lib/node.ts` for inspiration,
+including how to correctly handle the tricky combination of errors, abort, etc.
+
+# Documentation
+
+Every public class and method has been documented with JSDoc. Using e.g. an
+editor with Typescript support, you'll get instant inline documentation.
+
+An automatically generated online version of this documentation is still on
+the TODO...
+
 # Notes
 
+- To wait until all elements in a stream pipeline have completely finished
+  simply wait for any element's `result()` (instead of `end()`, especially in
+  the middle of a pipeline).
+  Note that `forEach()` also returns `result()` for your convenience.
 - Only one 'reader' can be attached to a stream: an explicit 'splitter' is
   needed to stream to multiple destinations. This is considered a feature,
   as different choices can be made for when to start streaming, how to handle
@@ -332,7 +306,7 @@ unit tests.
 Run `npm test` to recompile and run the tests again.
 
 If you want to debug the Typescript code, it may be helpful to use the
-sourcemaps provided during compile. Just `require("source-map-support").install();`
+sourcemaps provided during compile. Just `require("source-map-support/register");`
 in your program.
 
 # TODO
@@ -356,6 +330,14 @@ items will be added to this list though...):
 
 List of most notable changes for each release. For details, just see the commits
 between each version tag on GitHub.
+
+0.8.0 (2016-02-28):
+- Switch to `"moduleResolution": "node"`-compatible typings
+  - To use these typings, simply put that setting in your `tsconfig.json` and
+    remove the (manual) reference to the ts-stream.d.ts file from your project.
+- Update to latest Typescript (1.8.2)
+- Update to latest ts-promise (for new typings)
+- Use TSLint, fix linting errors
 
 0.7.0 (2015-08-02):
 - Add `hasReader()`, indicates whether `forEach()` is attached (#20)
