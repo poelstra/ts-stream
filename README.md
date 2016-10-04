@@ -275,10 +275,10 @@ the TODO...
 
 # Status
 
-The API is not stable yet, but the examples should give a good feel for what it
-will look like. Experiments are being performed to model certain real-world
-scenarios, fine-tuning the API as we go.
+The package has successfully been used in production in a large (closed-source,
+unfortunately) project for over a year now.
 
+However, there's always room for improvement.
 Especially details around `abort()` are not finalized (see e.g. #24).
 A number of TODO's in the code need some love.
 A number of methods are still marked as experimental (and basically undocumented
@@ -290,7 +290,24 @@ functionality (especially Stream and Transform and their `map` etc).
 Feedback on what you like and dislike about the API is welcome! Just file an
 issue on the Github project!
 
-# Development
+# TODO
+
+Stuff that needs to be done before calling it 1.0, in arbitrary order (more
+items will be added to this list though...):
+- Stabilize API (most notably abort handling and methods marked experimental)
+- More and better documentation, mostly updating the examples and including
+  abort handling, error best-practices, etc.
+- More unit tests, cleanup of existing ones (all 'core' functionality is already
+  100% covered except filter(), aiming for 100% coverage though)
+- Set of 'standard' Transforms like Merge, Split, Queue, Batch, Limit, etc.
+- Wrappers for Node streams (some already done), iterators, etc.
+- Verify browser support
+- Add UMD version of module?
+- Support transducers (if possible: need backpressure)
+- Address TODO's in code
+- Refine or remove experimental stuff
+
+# Contributing
 
 Want to fiddle with the sources?
 
@@ -308,23 +325,6 @@ Run `npm test` to recompile and run the tests again.
 If you want to debug the Typescript code, it may be helpful to use the
 sourcemaps provided during compile. Just `require("source-map-support/register");`
 in your program.
-
-# TODO
-
-Stuff that needs to be done before calling it 1.0, in arbitrary order (more
-items will be added to this list though...):
-- Stabilize API (most notably abort handling and methods marked experimental)
-- More and better documentation, mostly updating the examples and including
-  abort handling, error best-practices, etc.
-- More unit tests, cleanup of existing ones (all 'core' functionality is already
-  100% covered except filter(), aiming for 100% coverage though)
-- Set of 'standard' Transforms like Merge, Split, Queue, Batch, Limit, etc.
-- Wrappers for Node streams, iterators, etc.
-- Verify browser support
-- Add UMD version of module?
-- Support transducers (if possible: need backpressure)
-- Address TODO's in code
-- Refine or remove experimental stuff
 
 # Changelog
 
