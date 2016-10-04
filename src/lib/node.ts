@@ -13,7 +13,7 @@ import * as fs from "fs";
 import { Promise, Thenable, VoidDeferred } from "ts-promise";
 
 import { Stream, Readable } from "./Stream";
-import { swallowErrors, noop } from "./util";
+import { swallowErrors } from "./util";
 
 /**
  * Convert ts-stream into a Node.JS Readable instance.
@@ -56,7 +56,7 @@ export class NodeReadable<T> extends NodeStream.Readable {
 				if (err) {
 					this.emit("error", err);
 				}
-				this.push(null);
+				this.push(null); // tslint:disable-line:no-null-keyword
 			},
 			(abortError: Error) => {
 				// Abort pending read, if necessary
@@ -68,7 +68,7 @@ export class NodeReadable<T> extends NodeStream.Readable {
 		));
 	}
 
-	_read(size: number): void {
+	public _read(size: number): void {
 		if (this._resumer) {
 			this._resumer();
 			this._resumer = undefined;

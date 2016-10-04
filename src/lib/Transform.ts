@@ -56,7 +56,7 @@ function composeEnders(
 	};
 }
 
-export function map<T,R>(
+export function map<T, R>(
 	readable: Readable<T>,
 	writable: Writable<R>,
 	mapper: (value: T) => R|Thenable<R>,

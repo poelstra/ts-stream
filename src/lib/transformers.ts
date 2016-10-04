@@ -10,7 +10,7 @@
 
 import { Thenable } from "ts-promise";
 
-import { Stream, Readable, Writable } from "./Stream";
+import { Readable, Writable } from "./Stream";
 import { Transform, filter, map } from "./Transform";
 
 export function mapper<In, Out>(mapFn: (value: In) => Out|Thenable<Out>): Transform<In, Out> {

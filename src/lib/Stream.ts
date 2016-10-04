@@ -8,11 +8,11 @@
 
 "use strict"; /* istanbul ignore next */ // ignores Typescript's __extend() function
 
-import { Promise, Thenable, BaseError } from "ts-promise";
+import { Promise, Thenable, BaseError, Deferred } from "ts-promise";
 import * as assert from "assert";
 
 import { Transform, map, filter } from "./Transform";
-import { swallowErrors, noop } from "./util";
+import { swallowErrors } from "./util";
 
 /**
  * Required methods for both readable and writable parts of a stream.
@@ -439,18 +439,23 @@ function defaultEnder(err?: Error): void|Promise<void> {
 /**
  * Special internal 'error' value to indicate normal stream end.
  */
-var eof = new Error("eof");
+const EOF = new Error("eof");
 
 /**
  * Special end-of-stream value, optionally signalling an error.
  */
 class Eof {
+	public error?: Error;
+	public result?: Thenable<void>;
+
 	/**
 	 * Create new end-of-stream value, optionally signalling an error.
 	 * @param error     Optional Error value
 	 * @param result Optional final result value of `result()`
 	 */
-	constructor(public error?: Error, public result?: Thenable<void>) {
+	constructor(error?: Error, result?: Thenable<void>) {
+		this.error = error;
+		this.result = result;
 	}
 }
 
@@ -460,15 +465,15 @@ class Eof {
  */
 interface WriteItem<T> {
 	/**
+	 * Resolver `write()`'s returned promise
+	 */
+	resolveWrite: (done?: void|Thenable<void>) => void;
+
+	/**
 	 * Promise for value passed to `write()`.
 	 * Either a special Eof value, or a value of type `T`.
 	 */
 	value: Promise<Eof|T>;
-
-	/**
-	 * Resolver `write()`'s returned promise
-	 */
-	resolveWrite: (done?: void|Thenable<void>) => void;
 }
 
 /**
@@ -536,13 +541,13 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	/**
 	 * Resolved to a rejection when `abort()` is called.
 	 */
-	private _abortDeferred = Promise.defer();
+	private _abortDeferred: Deferred<void> = Promise.defer();
 
 	/**
 	 * Resolved to the result of calling `_ender`, then the `result` property of
 	 * the end-of-stream value.
 	 */
-	private _resultDeferred = Promise.defer();
+	private _resultDeferred: Deferred<void> = Promise.defer();
 
 	/**
 	 * Write value (or promise for value) to stream.
@@ -563,7 +568,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param value Value to write, or promise for it
 	 * @return Void-promise that resolves when value was processed by reader
 	 */
-	write(value: T|Thenable<T>): Promise<void> {
+	public write(value: T|Thenable<T>): Promise<void> {
 		if (value === undefined) {
 			// Technically, we could allow this, but it's a common programming
 			// error to forget to return a value, and it's arguable whether it's
@@ -578,8 +583,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		let valuePromise = Promise.resolve(value);
 		let writeDone = Promise.defer();
 		this._writers.push({
+			resolveWrite: writeDone.resolve,
 			value: valuePromise,
-			resolveWrite: writeDone.resolve
 		});
 		this._pump();
 		return writeDone.promise;
@@ -609,8 +614,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @return Void-promise that resolves when end-handler has processed the
 	 *         end-of-stream
 	 */
-	end(error?: Error, endedResult?: Thenable<void>): Promise<void> {
-		if (!(error === undefined || error === null || error instanceof Error)) {
+	public end(error?: Error, endedResult?: Thenable<void>): Promise<void> {
+		if (!(error === undefined || error === null || error instanceof Error)) { // tslint:disable-line:no-null-keyword
 			return Promise.reject(
 				new TypeError("invalid argument to end(): must be undefined, null or Error object")
 			);
@@ -625,8 +630,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		let valuePromise = Promise.resolve(eof);
 		let writeDone = Promise.defer();
 		this._writers.push({
+			resolveWrite: writeDone.resolve,
 			value: valuePromise,
-			resolveWrite: writeDone.resolve
 		});
 		this._pump();
 		return writeDone.promise;
@@ -674,7 +679,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param ender   Optional callback called when stream is ended
 	 * @param aborter Optional callback called when stream is aborted
 	 */
-	forEach(
+	public forEach(
 		reader: (value: T) => void|Thenable<void>,
 		ender?: (error?: Error) => void|Thenable<void>,
 		aborter?: (error: Error) => void
@@ -718,7 +723,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *
 	 * @param reason Error value to signal a reason for the abort
 	 */
-	abort(reason: Error): void {
+	public abort(reason: Error): void {
 		if (this._abortPromise) {
 			return;
 		}
@@ -734,7 +739,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *
 	 * @return Promise that is rejected with abort error when stream is aborted
 	 */
-	aborted(): Promise<void> {
+	public aborted(): Promise<void> {
 		return this._abortDeferred.promise;
 	}
 
@@ -746,7 +751,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *
 	 * @return Promise resolved when stream has completely ended
 	 */
-	result(): Promise<void> {
+	public result(): Promise<void> {
 		return this._resultDeferred.promise;
 	}
 
@@ -757,7 +762,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @return true when `end()` was called but not acknowledged yet, false
 	 *         otherwise
 	 */
-	isEnding(): boolean {
+	public isEnding(): boolean {
 		return !!this._ending;
 	}
 
@@ -766,7 +771,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * called and its return Thenable, if any, is resolved).
 	 * @return true when stream has ended, false otherwise
 	 */
-	isEnded(): boolean {
+	public isEnded(): boolean {
 		return !!this._ended;
 	}
 
@@ -775,7 +780,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *
 	 * @return true when `end()` was called
 	 */
-	isEndingOrEnded(): boolean {
+	public isEndingOrEnded(): boolean {
 		return this.isEnding() || this.isEnded();
 	}
 
@@ -785,7 +790,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *
 	 * @return true when `forEach()` has been called on this stream
 	 */
-	hasReader(): boolean {
+	public hasReader(): boolean {
 		return !!this._reader;
 	}
 
@@ -806,7 +811,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param aborter Called when stream is aborted
 	 * @return New stream with mapped values
 	 */
-	map<R>(
+	public map<R>(
 		mapper: (value: T) => R|Thenable<R>,
 		ender?: (error?: Error) => void|Thenable<void>,
 		aborter?: (error: Error) => void
@@ -836,7 +841,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param aborter  Called when stream is aborted
 	 * @return New stream with filtered values.
 	 */
-	filter(
+	public filter(
 		filterer: (value: T) => boolean|Thenable<boolean>,
 		ender?: (error?: Error) => void|Thenable<void>,
 		aborter?: (error: Error) => void
@@ -878,7 +883,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *                 value is given, first value of stream is used.
 	 * @return Promise for final accumulator.
 	 */
-	reduce(
+	public reduce(
 		reducer: (accumulator: T, current: T, index: number, stream: ReadableStream<T>) => T|Thenable<T>,
 		initial?: T
 	): Promise<T>;
@@ -914,7 +919,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *                 value is given, first value of stream is used.
 	 * @return Promise for final accumulator.
 	 */
-	reduce<R>(
+	public reduce<R>(
 		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => R|Thenable<R>,
 		initial: R
 	): Promise<R>;
@@ -950,7 +955,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *                 value is given, first value of stream is used.
 	 * @return Promise for final accumulator.
 	 */
-	reduce<R>(
+	public reduce<R>(
 		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => R|Thenable<R>,
 		initial?: R
 	): Promise<R> {
@@ -984,7 +989,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *
 	 * @return Promise for an array of all stream values
 	 */
-	toArray(): Promise<T[]> {
+	public toArray(): Promise<T[]> {
 		let result: T[] = [];
 		return this.forEach((value: T) => { result.push(value); })
 			.return(result);
@@ -997,7 +1002,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param  writable Destination stream
 	 * @return The stream passed in, for easy chaining
 	 */
-	pipe<R extends Writable<T>>(writable: R): R {
+	public pipe<R extends Writable<T>>(writable: R): R {
 		writable.aborted().catch((err) => this.abort(err));
 		this.aborted().catch((err) => writable.abort(err));
 		this.forEach(
@@ -1015,7 +1020,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *                    as inputs.
 	 * @return Readable stream with the transformed results
 	 */
-	transform<R>(transformer: Transform<T, R>): ReadableStream<R> {
+	public transform<R>(transformer: Transform<T, R>): ReadableStream<R> {
 		let output = new Stream<R>();
 		transformer(this, output);
 		return output;
@@ -1043,7 +1048,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *               or `undefined` (or void promise) to end the stream.
 	 * @return Stream for all values in the input array
 	 */
-	writeEach(writer: () => T|Thenable<T>|void|Thenable<void>): Promise<void> {
+	public writeEach(writer: () => T|Thenable<T>|void|Thenable<void>): Promise<void> {
 		this.aborted().catch((abortError) => {
 			// Swallow errors from the end call, as they will be reflected in
 			// result() too
@@ -1061,7 +1066,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 				} else {
 					return this.write(value).then(loop);
 				}
-			})
+			});
 		};
 		Promise.resolve().then(loop).done(undefined, (error: Error) => this.abort(error));
 		return this.result();
@@ -1069,7 +1074,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 
 	// TODO Experimental
 	// TODO Not sure whether a 'reverse' function confuses more than it helps
-	mappedBy<X>(mapper: (value: X) => T|Thenable<T>): WritableStream<X> {
+	public mappedBy<X>(mapper: (value: X) => T|Thenable<T>): WritableStream<X> {
 		let input = new Stream<X>();
 		map(input, this, mapper);
 		return input;
@@ -1077,7 +1082,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 
 	// TODO Experimental
 	// TODO Not sure whether a 'reverse' function confuses more than it helps
-	filterBy(filterer: (value: T) => boolean|Thenable<boolean>): WritableStream<T> {
+	public filterBy(filterer: (value: T) => boolean|Thenable<boolean>): WritableStream<T> {
 		let input = new Stream<T>();
 		filter(input, this, filterer);
 		return input;
@@ -1097,7 +1102,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param data (Promise for) input array of (promises for) values
 	 * @return Stream of all values in the input array
 	 */
-	static from<T>(data: Thenable<Thenable<T>[]>): ReadableStream<T>;
+	public static from<T>(data: Thenable<Thenable<T>[]>): ReadableStream<T>;
 	/**
 	 * Return a Stream for all values in the input array.
 	 *
@@ -1112,7 +1117,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param data (Promise for) input array of (promises for) values
 	 * @return Stream of all values in the input array
 	 */
-	static from<T>(data: Thenable<T>[]): ReadableStream<T>;
+	public static from<T>(data: Thenable<T>[]): ReadableStream<T>;
 	/**
 	 * Return a Stream for all values in the input array.
 	 *
@@ -1127,7 +1132,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param data (Promise for) input array of (promises for) values
 	 * @return Stream of all values in the input array
 	 */
-	static from<T>(data: Thenable<T[]>): ReadableStream<T>;
+	public static from<T>(data: Thenable<T[]>): ReadableStream<T>;
 	/**
 	 * Return a Stream for all values in the input array.
 	 *
@@ -1142,7 +1147,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param data (Promise for) input array of (promises for) values
 	 * @return Stream of all values in the input array
 	 */
-	static from<T>(data: T[]): ReadableStream<T>;
+	public static from<T>(data: T[]): ReadableStream<T>;
 	/**
 	 * Return a Stream for all values in the input array.
 	 *
@@ -1157,7 +1162,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param data (Promise for) input array of (promises for) values
 	 * @return Stream of all values in the input array
 	 */
-	static from<T>(data: T[]|Thenable<T[]>|Thenable<T>[]|Thenable<Thenable<T>[]>): ReadableStream<T> {
+	public static from<T>(data: T[]|Thenable<T[]>|Thenable<T>[]|Thenable<Thenable<T>[]>): ReadableStream<T> {
 		let stream = new Stream<T>();
 		let i = 0;
 		if (Array.isArray(data)) {
@@ -1201,7 +1206,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			this._writers.shift().resolveWrite(this._readBusy);
 			if (this._endPending) {
 				let result = this._endPending.result;
-				this._ended = this._endPending.error || eof;
+				this._ended = this._endPending.error || EOF;
 				this._ending = undefined;
 				this._endPending = undefined;
 				this._aborter = undefined; // no longer call aborter after end handler has finished
