@@ -1,0 +1,15 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+	"typescript.tsdk": "node_modules/typescript/lib/",
+	"files.exclude": {
+		"**/.git": true,
+		"**/.svn": true,
+		"**/.DS_Store": true,
+		"**/*.js": { "when": "$(basename).ts"},
+		"**/*.map": { "when": "$(basename)"}
+	},
+	"markdownlint.config": {
+		"default": true,
+		"no-hard-tabs": false
+	}
+}
