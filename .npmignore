@@ -1,7 +1,6 @@
 /coverage/
 /examples/
 /test/
-/typings/
 /tsd.json
 /tslint.json
 /.editorconfig
