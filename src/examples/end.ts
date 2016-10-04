@@ -6,13 +6,13 @@
  * License: MIT
  */
 
-/// <reference path="../typings/tsd.d.ts" />
-
 import Stream from "../lib/index";
 
+// Stream.from() automatically ends the stream when all values have been written.
 Stream.from([1, 2, 3, 4])
-	.map((n) => n * 2)
-	.toArray()
-	.then((values) => console.log(values));
+	.forEach(
+		(n) => console.log(n),
+		(err) => console.log("end", err || "ok")
+	);
 
-// [2, 4, 6, 8]
+// 1, 2, 3, 4, end ok

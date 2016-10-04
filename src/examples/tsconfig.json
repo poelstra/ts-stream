@@ -1,5 +1,4 @@
 {
-    "version": "1.8.2",
     "compilerOptions": {
         "target": "es5",
         "module": "commonjs",
@@ -10,16 +9,12 @@
         "noLib": false,
         "preserveConstEnums": true,
         "suppressImplicitAnyIndexErrors": true,
-        "moduleResolution": "node"
+        "moduleResolution": "node",
+        "outDir": "../../dist/",
+        "rootDir": ".."
     },
-    "filesGlob": [
-        "../typings/tsd-dev.d.ts",
-        "**/*.ts",
-        "!**/*.d.ts"
-    ],
-    "files": [
-        "../typings/tsd-dev.d.ts",
-        "test-Stream.ts"
+    "types": [
+        "node"
     ],
     "atom": {
         "rewriteTsconfig": true

@@ -6,8 +6,6 @@
  * License: MIT
  */
 
-/// <reference path="../typings/tsd.d.ts" />
-
 import Promise from "ts-promise";
 import Stream from "../lib/index";
 

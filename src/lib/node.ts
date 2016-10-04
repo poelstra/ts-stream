@@ -6,8 +6,6 @@
  * License: MIT
  */
 
-/// <reference path="../typings/node/node.d.ts" />
-
 "use strict";
 
 import * as NodeStream from "stream";
