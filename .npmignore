@@ -9,5 +9,6 @@
 /.gitignore
 /.npmignore
 /.travis.yml
-
+/lib/*.ts
+!/lib/*.d.ts
 tsconfig.json
