@@ -331,6 +331,12 @@ in your program.
 List of most notable changes for each release. For details, just see the commits
 between each version tag on GitHub.
 
+0.9.0 (2016-10-04):
+- Split sources and build output to prevent TS2 from trying to rebuild our .ts files
+- Use `@types` typings
+- Update dependencies (mostly dev deps), including TypeScript 2.0.3
+- Fix new lint errors
+
 0.8.0 (2016-02-28):
 - Switch to `"moduleResolution": "node"`-compatible typings
   - To use these typings, simply put that setting in your `tsconfig.json` and
