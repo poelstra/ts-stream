@@ -331,6 +331,9 @@ in your program.
 List of most notable changes for each release. For details, just see the commits
 between each version tag on GitHub.
 
+0.9.1 (2017-01-11):
+- Allow all `@types/node` versions
+
 0.9.0 (2016-10-04):
 - Split sources and build output to prevent TS2 from trying to rebuild our .ts files
 - Use `@types` typings
