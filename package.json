@@ -6,7 +6,6 @@
   "scripts": {
     "test": "npm run lint && npm run build && mocha dist/test/test-*.js",
     "cover": "npm run build && istanbul cover _mocha -- dist/test/test-*.js",
-    "prepublish": "npm run test",
     "build": "tsc -p src/lib/ && tsc -p src/test/ && tsc -p src/examples",
     "lint": "tslint -t verbose src/**/*.ts"
   },
@@ -27,8 +26,7 @@
   },
   "homepage": "https://github.com/poelstra/ts-stream#readme",
   "dependencies": {
-    "@types/node": "*",
-    "ts-promise": "^0.3.1"
+    "@types/node": "*"
   },
   "typings": "./dist/lib/index.d.ts",
   "devDependencies": {
