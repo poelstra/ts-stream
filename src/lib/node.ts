@@ -6,8 +6,6 @@
  * License: MIT
  */
 
-"use strict";
-
 import * as NodeStream from "stream";
 import * as fs from "fs";
 

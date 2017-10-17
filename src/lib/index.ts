@@ -6,8 +6,6 @@
  * License: MIT
  */
 
-"use strict";
-
 export * from "./Stream";
 export * from "./Transform";
 export * from "./transformers";
