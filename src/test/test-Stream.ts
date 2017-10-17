@@ -8,8 +8,6 @@
 
 /* tslint:disable:no-null-keyword */ // we use a lot of speficic null-checks below
 
-"use strict";
-
 import "source-map-support/register";
 import { expect } from "chai";
 

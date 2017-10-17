@@ -6,7 +6,7 @@
  * License: MIT
  */
 
-"use strict"; /* istanbul ignore next */ // ignores Typescript's __extend() function
+/* istanbul ignore next */ // ignores Typescript's __extend() function
 
 import * as assert from "assert";
 

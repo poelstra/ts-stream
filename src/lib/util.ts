@@ -6,8 +6,6 @@
  * License: MIT
  */
 
-"use strict";
-
 /**
  * Do nothing.
  */

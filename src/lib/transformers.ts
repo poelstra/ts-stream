@@ -6,8 +6,6 @@
  * License: MIT
  */
 
-"use strict";
-
 import { Readable, Writable } from "./Stream";
 import { Transform, filter, map } from "./Transform";
 

@@ -6,8 +6,6 @@
  * License: MIT
  */
 
-"use strict";
-
 import { Stream, Readable, Writable } from "./Stream";
 
 export interface Transform<In, Out> {
