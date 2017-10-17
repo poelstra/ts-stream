@@ -6,8 +6,8 @@
  * License: MIT
  */
 
-import Promise from "ts-promise";
 import Stream from "../lib/index";
+import {delay} from "../lib/util";
 
 // Create a source that produces numbers 0, 1, 2, 3
 var i = 0;
@@ -28,7 +28,7 @@ source.writeEach(() => {
 source.forEach(
 	(n) => {
 		console.log("read", n);
-		return Promise.delay(1000);
+		return delay(1000);
 	},
 	(err) => {
 		if (err) {
@@ -36,7 +36,7 @@ source.forEach(
 		} else {
 			console.log("forEach() end received");
 		}
-		return Promise.delay(1000);
+		return delay(1000);
 	}
 );
 

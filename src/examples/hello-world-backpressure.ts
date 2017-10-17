@@ -6,11 +6,11 @@
  * License: MIT
  */
 
-import Promise from "ts-promise";
 import Stream from "../lib/index";
+import {delay} from "../lib/util";
 
 Stream.from([1, 2, 3, 4])
-	.map((n) => Promise.resolve(n * 2).delay(1000))
-	.forEach((n) => console.log(n));
+	.map((n: number) => Promise.resolve(n * 2).then((k: number) => delay(1000, k)))
+	.forEach((n: number) => console.log(n));
 
 // 2, 4, 6, 8 (with pauses of a second)

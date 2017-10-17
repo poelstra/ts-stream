@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "target": "es5",
+        "target": "ES2015",
         "module": "commonjs",
         "declaration": true,
         "noImplicitAny": true,
@@ -11,7 +11,10 @@
         "suppressImplicitAnyIndexErrors": true,
         "moduleResolution": "node",
         "outDir": "../../dist/",
-        "rootDir": ".."
+        "rootDir": "..",
+        "lib": [
+            "es2015"
+        ]
     },
     "types": [
         "chai",

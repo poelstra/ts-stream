@@ -8,7 +8,6 @@
 
 "use strict";
 
-import { Promise, Thenable } from "ts-promise";
 import { Stream, Readable, Writable } from "./Stream";
 
 export interface Transform<In, Out> {
@@ -28,9 +27,9 @@ export function compose<In, Middle, Out>(t1: Transform<In, Middle>, t2: Transfor
 // It's refactored out, because it's currently a bit tricky and exact behavior
 // may change, see TODO in implementation.
 function composeEnders(
-	ender: (error?: Error) => void|Thenable<void>,
-	defaultEnder: (error?: Error) => void|Thenable<void>
-): (error?: Error) => void|Thenable<void> {
+	ender: (error?: Error) => void|PromiseLike<void>,
+	defaultEnder: (error?: Error) => void|PromiseLike<void>
+): (error?: Error) => void|PromiseLike<void> {
 	if (!ender) {
 		return defaultEnder;
 	}
@@ -59,8 +58,8 @@ function composeEnders(
 export function map<T, R>(
 	readable: Readable<T>,
 	writable: Writable<R>,
-	mapper: (value: T) => R|Thenable<R>,
-	ender?: (error?: Error) => void|Thenable<void>,
+	mapper: (value: T) => R|PromiseLike<R>,
+	ender?: (error?: Error) => void|PromiseLike<void>,
 	aborter?: (error: Error) => void
 ): void {
 	writable.aborted().catch((err) => readable.abort(err));
@@ -75,8 +74,8 @@ export function map<T, R>(
 export function filter<T>(
 	readable: Readable<T>,
 	writable: Writable<T>,
-	filterer: (value: T) => boolean|Thenable<boolean>,
-	ender?: (error?: Error) => void|Thenable<void>,
+	filterer: (value: T) => boolean|PromiseLike<boolean>,
+	ender?: (error?: Error) => void|PromiseLike<void>,
 	aborter?: (error: Error) => void
 ): void {
 	writable.aborted().catch((err) => readable.abort(err));
@@ -88,7 +87,7 @@ export function filter<T>(
 				return;
 			} else if (b === true) { // note: not just `if (b)`!
 				return writable.write(v);
-			} else { // more complex return type, probably a Thenable
+			} else { // more complex return type, probably a PromiseLike
 				return Promise.resolve(b).then((resolvedB) => {
 					if (resolvedB) {
 						return writable.write(v);
