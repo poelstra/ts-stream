@@ -5,25 +5,40 @@
  * License: MIT
  */
 
-var hasStacks = (typeof (<any>Error).captureStackTrace === "function");
-
 export default class BaseError extends Error {
 	public stack: string; // provided by V8
 
 	constructor(name: string, message: string) {
 		super(message);
+
+		let fixStack = false;
+
+		// This fixes the prototype chain if it's broken (when emitting for ES 5 or lower)
+		if (this.constructor !== new.target) {
+			Object.setPrototypeOf(this, new.target.prototype);
+			fixStack = true;
+		}
+
+		// This occurs when the error is not thrown but only created in IE
+		if (!("stack" in this)) {
+			fixStack = true;
+		}
+
 		this.name = name;
 
-		// Note: still need to 'manually' assign .message,
-		// because engines apparently don't allow subclassing properly.
-		// https://github.com/Microsoft/TypeScript/issues/1168#issuecomment-107729088
-		this.message = message;
-
-		/* istanbul ignore else */ // TODO: remove when testing for non-V8
-		if (hasStacks) {
-			(<any>Error).captureStackTrace(this, this.constructor);
-		} else {
-			this.stack = "dummy\n<no trace>";
+		if (fixStack) {
+			// This.name and this.message must be set correctly in order to fix the stack correctly
+			if (Error.captureStackTrace) {
+				Error.captureStackTrace(this, new.target);
+			} else {
+				const error = new Error(this.message);
+				error.name = this.name;
+				try {
+					throw error;
+				} catch (error) {
+					this.stack = error.stack || String(error);
+				}
+			}
 		}
 	}
 }
