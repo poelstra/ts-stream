@@ -12,7 +12,7 @@ import * as assert from "assert";
 
 import BaseError from "./BaseError";
 import { Transform, map, filter } from "./Transform";
-import {defer, Deferred, swallowErrors, track, TrackedPromise} from "./util";
+import { defer, Deferred, swallowErrors, track, TrackedPromise } from "./util";
 
 /**
  * Required methods for both readable and writable parts of a stream.
