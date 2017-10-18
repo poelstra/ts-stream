@@ -8,7 +8,7 @@ both in 'plain' Javascript and TypeScript.
 
 Features:
 - Type-safe (TypeScript)
-- Promisified interface
+- Promisified interface (using native Promises, use a [polyfill](https://www.npmjs.com/package/es6-promise) if necessary)
 - Easy to implement a stream with error handling and backpressure
 - More options for error handling
 - Support for stream aborting
@@ -273,37 +273,28 @@ the TODO...
 
 # Status
 
-The package has successfully been used in production in a large (closed-source,
-unfortunately) project for over a year now.
+The package has been battle-tested in production in a large (closed-source,
+unfortunately) project for many years now.
 
-However, there's always room for improvement.
-Especially details around `abort()` are not finalized (see e.g. #24).
-A number of TODO's in the code need some love.
+However, there's always room for improvement, see open issues for ideas.
+A number of small TODO's in the code need some love.
 A number of methods are still marked as experimental (and basically undocumented
 nor unit-tested). They need to be refined (probably by making a few examples
 with them) or removed.
 Also some smaller things may change, such as the 'grouping'/naming of certain
 functionality (especially Stream and Transform and their `map` etc).
 
-Feedback on what you like and dislike about the API is welcome! Just file an
-issue on the Github project!
-
 # TODO
 
-Stuff that needs to be done before calling it 1.0, in arbitrary order (more
-items will be added to this list though...):
-- Stabilize API (most notably abort handling and methods marked experimental)
 - More and better documentation, mostly updating the examples and including
-  abort handling, error best-practices, etc.
+  docs on abort handling, error best-practices, etc.
 - More unit tests, cleanup of existing ones (all 'core' functionality is already
   100% covered except filter(), aiming for 100% coverage though)
 - Set of 'standard' Transforms like Merge, Split, Queue, Batch, Limit, etc.
 - Wrappers for Node streams (some already done), iterators, etc.
-- Verify browser support
-- Add UMD version of module?
 - Support transducers (if possible: need backpressure)
 - Address TODO's in code
-- Refine or remove experimental stuff
+- Refine or remove methods marked as experimental
 
 # Contributing
 
@@ -328,6 +319,10 @@ in your program.
 
 List of most notable changes for each release. For details, just see the commits
 between each version tag on GitHub.
+
+1.0.0 (2017-10-18):
+- Switch to native promises (#30, thanks @rogierschouten!)
+  - Use e.g. `import { polyfill } from "ts-promise"; polyfill();` to support an environment that doesn't have a native Promise implementation yet.
 
 0.9.1 (2017-01-11):
 - Allow all `@types/node` versions
