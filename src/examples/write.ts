@@ -6,7 +6,6 @@
  * License: MIT
  */
 
-import Promise from "ts-promise";
 import Stream from "../lib/index";
 
 var source = new Stream<number>();
@@ -25,7 +24,7 @@ p.then(
 		return source.end(err);
 	}
 )
-.done(
+.then(
 	() => console.log("write end ok"),
 	(err) => console.log("write end failed", err)
 );

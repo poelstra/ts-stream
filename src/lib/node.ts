@@ -6,14 +6,11 @@
  * License: MIT
  */
 
-"use strict";
-
 import * as NodeStream from "stream";
 import * as fs from "fs";
-import { Promise, Thenable, VoidDeferred } from "ts-promise";
 
 import { Stream, Readable } from "./Stream";
-import { swallowErrors } from "./util";
+import { defer, swallowErrors, VoidDeferred } from "./util";
 
 /**
  * Convert ts-stream into a Node.JS Readable instance.
@@ -29,7 +26,7 @@ import { swallowErrors } from "./util";
  * @see `pipeToNodeStream()` for easier error and completion handling.
  */
 export class NodeReadable<T> extends NodeStream.Readable {
-	private _resumer: (value?: void|Thenable<void>) => void;
+	private _resumer: (value?: void|PromiseLike<void>) => void;
 
 	/**
 	 * Create new NodeJS Readable based on given ts-stream Readable.
@@ -48,7 +45,7 @@ export class NodeReadable<T> extends NodeStream.Readable {
 					return;
 				}
 				// Stream blocked, wait until _read() is called
-				let d = Promise.defer();
+				let d = defer();
 				this._resumer = d.resolve;
 				return d.promise;
 			},
@@ -140,7 +137,7 @@ export function pipeToNodeStream<T>(
 	nodeWritable: NodeJS.WritableStream,
 	emitError: boolean = false
 ): Promise<void> {
-	let endDeferred = Promise.defer();
+	let endDeferred = defer();
 	let blockedDeferred: VoidDeferred;
 
 	// Handle errors emitted by node stream: abort ts-stream
@@ -180,7 +177,7 @@ export function pipeToNodeStream<T>(
 			let canAcceptMore = nodeWritable.write(chunk);
 			if (!canAcceptMore) {
 				// Stream blocked, wait until drain is emitted
-				blockedDeferred = Promise.defer();
+				blockedDeferred = defer();
 				nodeWritable.once("drain", blockedDeferred.resolve);
 				return blockedDeferred.promise;
 			}

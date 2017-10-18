@@ -13,8 +13,6 @@ Features:
 - More options for error handling
 - Support for stream aborting
 - Support for EOF (with or without error)
-- Long stack trace support for errors thrown downstream (i.e. know which
-  transform threw an error, and where that value came from) through ts-promise
 
 # Usage and examples
 

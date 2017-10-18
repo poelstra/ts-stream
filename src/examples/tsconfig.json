@@ -11,7 +11,10 @@
         "suppressImplicitAnyIndexErrors": true,
         "moduleResolution": "node",
         "outDir": "../../dist/",
-        "rootDir": ".."
+        "rootDir": "..",
+        "lib": [
+            "es2015"
+        ]
     },
     "types": [
         "node"
