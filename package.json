@@ -9,7 +9,9 @@
     "prepare": "npm test",
     "prepublishOnly": "npm run test",
     "build": "tsc -p src/lib/ && tsc -p src/test/ && tsc -p src/examples",
-    "lint": "tslint -t verbose src/**/*.ts"
+    "lint": "tslint -t verbose src/**/*.ts",
+    "preversion": "npm install",
+    "version": "git add package-lock.json"
   },
   "repository": {
     "type": "git",
