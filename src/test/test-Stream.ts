@@ -1363,5 +1363,49 @@ describe("Stream", () => {
 				.catch(() => undefined);
 			setTimeout(done, 10);
 		});
+
+		it("should wait for source stream before passing on result", (done: MochaDone) => {
+			const result = new Stream();
+			const stream = new Stream();
+			const d = defer();
+
+			// Create stream that already ended with an error
+			swallowErrors(stream.end(new Error("foo")));
+
+			// Pipe to follow-up stream, but make the end of this stream wait on `d`
+			stream.forEach(
+				(v) => result.write(v),
+				(e) => {
+					swallowErrors(result.end(e, stream.result()));
+					return d.promise;
+				}
+			);
+
+			let ended = false;
+			let finished = false;
+			result.forEach(
+				() => undefined,
+				(e) => {
+					ended = true;
+					throw e;
+				}
+			).catch(() => { finished = true; });
+
+			setTimeout(
+				() => {
+					expect(ended).to.equal(true);
+					expect(finished).to.equal(false);
+					d.resolve();
+					setTimeout(
+						() => {
+							expect(finished).to.equal(true);
+							done();
+						},
+						10
+					);
+				},
+				10
+			);
+		});
 	});
 });
