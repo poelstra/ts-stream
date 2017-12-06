@@ -140,24 +140,28 @@ export interface TrackedVoidPromise extends TrackedPromise<void> {
 export function track(p: PromiseLike<void>): TrackedVoidPromise;
 export function track<T>(p: PromiseLike<T>): TrackedPromise<T>;
 export function track<T>(p: PromiseLike<T>): TrackedPromise<T> {
-	const tracked: TrackedPromise<T> = {
+	let tracked: TrackedPromise<T>;
+	const trackedPromise = p
+		.then(
+			(value: T): T => {
+				tracked.isPending = false;
+				tracked.isFulfilled = true;
+				tracked.value = value;
+				return value;
+			},
+			(error: Error): T => {
+				tracked.isPending = false;
+				tracked.isRejected = true;
+				tracked.reason = error;
+				throw error;
+			}
+		);
+	tracked = {
 		isFulfilled: false,
 		isPending: true,
 		isRejected: false,
-		promise: p,
+		promise: trackedPromise,
 	};
-	p.then(
-		(value: T): void => {
-			tracked.isPending = false;
-			tracked.isFulfilled = true;
-			tracked.value = value;
-		},
-		(error: Error): void => {
-			tracked.isPending = false;
-			tracked.isRejected = true;
-			tracked.reason = error;
-		}
-	);
 	return tracked;
 }
 
