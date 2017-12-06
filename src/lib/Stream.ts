@@ -1215,7 +1215,19 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 				this._ending = undefined;
 				this._endPending = undefined;
 				this._aborter = undefined; // no longer call aborter after end handler has finished
-				let p = result ? this._readBusy.promise.then(() => result) : this._readBusy.promise;
+				let p: PromiseLike<void>;
+				if (result) {
+					// wait for the result, but be sure to throw the original error, if any
+					p = this._readBusy.promise.then(
+						() => result,
+						(e) => {
+							const thrower = () => { throw e; };
+							return result.then(thrower, thrower);
+						}
+					);
+				} else {
+					p = this._readBusy.promise;
+				}
 				this._resultDeferred.resolve(p);
 			}
 			this._readBusy = undefined;

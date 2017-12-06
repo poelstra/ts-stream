@@ -13,6 +13,7 @@ import { expect } from "chai";
 
 import { Stream, ReadableStream, WriteAfterEndError, AlreadyHaveReaderError, Transform } from "../lib/index";
 
+import "./mocha-init";
 import { defer, delay, settle, swallowErrors, track } from "./util";
 
 function readInto<T>(stream: ReadableStream<T>, into: T[]): Promise<void> {
@@ -674,6 +675,9 @@ describe("Stream", () => {
 				}
 			});
 			const writes = [track(s.write(1)), track(s.write(2)), track(s.end())];
+			writes.forEach((t): void => {
+				swallowErrors(t.promise);
+			});
 			readInto(mapped, results);
 			await settle([s.result()]);
 			expect(results).to.deep.equal([4]);
@@ -691,6 +695,9 @@ describe("Stream", () => {
 				}
 			});
 			const writes = [track(s.write(1)), track(s.write(2)), track(s.end())];
+			writes.forEach((t): void => {
+				swallowErrors(t.promise);
+			});
 			readInto(mapped, results);
 			await settle([s.result()]);
 			expect(results).to.deep.equal([4]);
@@ -796,6 +803,9 @@ describe("Stream", () => {
 			const w1 = track(s.write(1));
 			const we = track(s.end());
 			const res = track(s.result());
+			[r, w1, we, res].forEach((t): void => {
+				swallowErrors(t.promise);
+			});
 			swallowErrors(mapped.result());
 
 			await delay(1);
@@ -824,6 +834,9 @@ describe("Stream", () => {
 			const w1 = track(s.write(1));
 			const we = track(s.end());
 			const res = track(s.result());
+			[r, w1, we, res].forEach((t): void => {
+				swallowErrors(t.promise);
+			});
 			swallowErrors(mapped.result());
 
 			await settle([r.promise, res.promise]);
@@ -854,6 +867,9 @@ describe("Stream", () => {
 			const w1 = track(s.write(1));
 			const we = track(s.end());
 			const res = track(s.result());
+			[w1, we, res].forEach((t): void => {
+				swallowErrors(t.promise);
+			});
 			swallowErrors(mapped.result());
 
 			await settle([res.promise]);
@@ -1335,4 +1351,17 @@ describe("Stream", () => {
 			expect(result.reason).to.equal(abortError);
 		});
 	}); // from()
+
+	describe("issue #31", (): void => {
+		it("should not result in unhandled rejections", (done: MochaDone): void => {
+			const result = new Stream();
+			const stream = new Stream();
+			stream.end(new Error("foo"))
+				.catch((error) => undefined);
+			stream.pipe(result);
+			result.forEach(() => undefined)
+				.catch(() => undefined);
+			setTimeout(done, 10);
+		});
+	});
 });
