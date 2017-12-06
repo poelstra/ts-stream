@@ -320,6 +320,11 @@ in your program.
 List of most notable changes for each release. For details, just see the commits
 between each version tag on GitHub.
 
+1.0.1 (2017-12-06):
+- Fix unhandled rejection error when error bounces back from ender in certain cases (#31, thanks @rogierschouten)
+  - Also fixes downstream streams not waiting for upstream streams in case downstream ender was rejected
+- Update to TypeScript 2.6.2
+
 1.0.0 (2017-10-18):
 - Switch to native promises (#30, thanks @rogierschouten!)
   - Use e.g. `import { polyfill } from "ts-promise"; polyfill();` to support an environment that doesn't have a native Promise implementation yet.
