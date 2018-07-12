@@ -1206,9 +1206,17 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 				return;
 			}
 
-			// Previous reader/ender has resolved, return its result to the
-			// corresponding write() or end() call
-			this._writers.shift().resolveWrite(this._readBusy.promise);
+			const writer = this._writers.shift();
+			if (this._endPending && this._endPending.error === this._readBusy.reason) {
+				// If the reason for the failure is the passed-in reason for failure
+				// we do not fail the end call because it technically succeeded as
+				// expected.
+				writer.resolveWrite();
+			} else {
+				// Previous reader/ender has resolved, return its result to the
+				// corresponding write() or end() call
+				writer.resolveWrite(this._readBusy.promise);
+			}
 			if (this._endPending) {
 				let result = this._endPending.result;
 				this._ended = this._endPending.error || EOF;

@@ -491,7 +491,7 @@ describe("Stream", () => {
 			const we = track(s.end(boomError));
 			await settle([res.promise, we.promise]);
 			expect(results).to.deep.equal([1, 2]);
-			expect(we.reason).to.equal(boomError);
+			expect(we.reason).to.equal(undefined);
 			expect(res.reason).to.equal(boomError);
 		});
 
@@ -1115,6 +1115,18 @@ describe("Stream", () => {
 			swallowErrors(s.end(boomError));
 			await settle([result.promise]);
 			expect(result.reason).to.deep.equal(boomError);
+		});
+
+		it("returns end error on abort", async () => {
+			const stream = new Stream<number>();
+			setImmediate(() => stream.end(new Error("ending the stream")));
+			try {
+				await stream.toArray();
+			} catch (e) {
+				expect(e.message).to.be.equal("ending the stream");
+				return;
+			}
+			throw new Error("An error should have been called");
 		});
 	}); // toArray()
 
