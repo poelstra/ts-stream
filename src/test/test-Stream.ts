@@ -491,7 +491,7 @@ describe("Stream", () => {
 			const we = track(s.end(boomError));
 			await settle([res.promise, we.promise]);
 			expect(results).to.deep.equal([1, 2]);
-			expect(we.reason).to.equal(boomError);
+			expect(we.reason).to.equal(undefined);
 			expect(res.reason).to.equal(boomError);
 		});
 
