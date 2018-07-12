@@ -1116,6 +1116,18 @@ describe("Stream", () => {
 			await settle([result.promise]);
 			expect(result.reason).to.deep.equal(boomError);
 		});
+
+		it("returns end error on abort", async () => {
+			const stream = new Stream<number>();
+			setImmediate(() => stream.end(new Error("ending the stream")));
+			try {
+				await stream.toArray();
+			} catch (e) {
+				expect(e.message).to.be.equal("ending the stream");
+				return;
+			}
+			throw new Error("An error should have been called");
+		});
 	}); // toArray()
 
 	describe("writeEach()", () => {
