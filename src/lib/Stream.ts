@@ -12,7 +12,7 @@ import * as assert from "assert";
 
 import BaseError from "./BaseError";
 import { Transform, map, filter } from "./Transform";
-import { defer, Deferred, swallowErrors, track, TrackedPromise } from "./util";
+import { defer, Deferred, swallowErrors, track, TrackedPromise, noop } from "./util";
 
 /**
  * Required methods for both readable and writable parts of a stream.
@@ -105,9 +105,9 @@ export interface Readable<T> extends Common<T> {
 	 * as possible. It will not be called after the output of `ender` has
 	 * resolved.
 	 *
-	 * If no `ender` is given, a default end handler is installed that returns
-	 * any stream end errors to the writer, and otherwise directly acknowledges
-	 * the end-of-stream.
+	 * If no `ender` is given, a default end handler is installed that directly
+	 * acknowledges the end-of-stream, also in case of an error. Note that that
+	 * error will still be returned from `forEach()`.
 	 *
 	 * The return value of `forEach()` is `result()`, a promise that resolves
 	 * when all parts in the stream(-chain) have completely finished.
@@ -426,17 +426,6 @@ export class AlreadyHaveReaderError extends BaseError {
 }
 
 /**
- * Default end-handler used in e.g. [[Stream.forEach]].
- * @param err `undefined` in case of normal stream end, or an Error
- * @return Rejected promise in case of an error, void otherwise
- */
-function defaultEnder(err?: Error): void|Promise<void> {
-	if (err) {
-		return Promise.reject(err);
-	}
-}
-
-/**
  * Special internal 'error' value to indicate normal stream end.
  */
 const EOF = new Error("eof");
@@ -672,10 +661,10 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * still pending, and should try to let `reader` or `ender` finish as fast
 	 * as possible. It will not be called after the output of `ender` has
 	 * resolved.
+	 * If no `ender` is given, a default end handler is installed that directly
+	 * acknowledges the end-of-stream, also in case of an error. Note that that
+	 * error will still be returned from `forEach()`.
 	 *
-	 * If no `ender` is given, a default end handler is installed that returns
-	 * any stream end errors to the writer, and otherwise directly acknowledges
-	 * the end-of-stream.
 	 *
 	 * It is an error to call `forEach()` multiple times.
 	 *
@@ -692,7 +681,11 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			return Promise.reject(new AlreadyHaveReaderError());
 		}
 		if (!ender) {
-			ender = defaultEnder;
+			// Default ender swallows errors, because they
+			// will already be signalled in the stream's
+			// `.result()` (and thus the output of `.forEach()`).
+			// See #35.
+			ender = noop;
 		}
 		this._reader = reader;
 		this._ender = ender;

@@ -481,8 +481,7 @@ describe("Stream", () => {
 			expect(res.isFulfilled).to.equal(true);
 		});
 
-		it("returns errors by default", async () => {
-			swallowErrors(s.result());
+		it("returns errors by default, but does not bounce them (#35)", async () => {
 			const res = track(s.forEach(
 				(v) => { results.push(v); }
 			));
@@ -491,7 +490,7 @@ describe("Stream", () => {
 			const we = track(s.end(boomError));
 			await settle([res.promise, we.promise]);
 			expect(results).to.deep.equal([1, 2]);
-			expect(we.reason).to.equal(boomError);
+			expect(we.isFulfilled).to.equal(true);
 			expect(res.reason).to.equal(boomError);
 		});
 
@@ -1115,6 +1114,13 @@ describe("Stream", () => {
 			swallowErrors(s.end(boomError));
 			await settle([result.promise]);
 			expect(result.reason).to.deep.equal(boomError);
+		});
+
+		it("doesn't bounce end error (#35)", async () => {
+			const result = track(s.toArray());
+			await s.end(boomError);
+			await result.promise.then(undefined, noop);
+			expect(result.reason).to.equal(boomError);
 		});
 	}); // toArray()
 
