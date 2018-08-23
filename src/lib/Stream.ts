@@ -64,9 +64,12 @@ export interface Common<T> {
 	 *
 	 * Useful to pass abort to upstream sources.
 	 *
+	 * Note: this promise either stays pending, or is rejected. It is never
+	 * fulfilled.
+	 *
 	 * @return Promise that is rejected with abort error when stream is aborted
 	 */
-	aborted(): Promise<void>;
+	aborted(): Promise<never>;
 }
 
 /**
@@ -534,7 +537,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	/**
 	 * Resolved to a rejection when `abort()` is called.
 	 */
-	private _abortDeferred: Deferred<void> = defer();
+	private _abortDeferred: Deferred<never> = defer<never>();
 
 	/**
 	 * Resolved to the result of calling `_ender`, then the `result` property of
@@ -735,9 +738,12 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 *
 	 * Useful to pass abort to up- and down-stream sources.
 	 *
+	 * Note: this promise either stays pending, or is rejected. It is never
+	 * fulfilled.
+	 *
 	 * @return Promise that is rejected with abort error when stream is aborted
 	 */
-	public aborted(): Promise<void> {
+	public aborted(): Promise<never> {
 		return this._abortDeferred.promise;
 	}
 
