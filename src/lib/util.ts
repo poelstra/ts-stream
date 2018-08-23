@@ -18,7 +18,7 @@ export function noop(...args: any[]): void {
  * Prevents PossiblyUnhandledExceptionErrors.
  */
 export function swallowErrors(promise: PromiseLike<any>): void {
-	promise.then(noop, noop);
+	promise.then(undefined, noop);
 }
 
 /**
