@@ -46,9 +46,10 @@ export interface Common<T> {
 	 * Any pending and future `write()`s after that will be rejected with the
 	 * given error.
 	 *
-	 * The stream is not ended until the writer explicitly `end()`s the stream,
-	 * after which the stream's `ender` callback is called with the abort error
-	 * (i.e. any error passed to `end()` is ignored).
+	 * It is still necessary to explicitly `end()` the stream, after which the
+	 * stream's `ender` callback is called with the abort error (i.e. any error
+	 * passed to `end()` is ignored). This ensures any resources can be cleaned
+	 * up correctly (both on reader and writer side).
 	 *
 	 * The abort is ignored if the stream is already aborted.
 	 * Note that it's possible to abort an ended stream, to allow the abort to
@@ -84,43 +85,55 @@ export interface Readable<T> extends Common<T> {
 	 * `ender` is called once, when the writer `end()`s the stream, either with
 	 * or without an error.
 	 *
-	 * `aborter` is called once if the stream is aborted and has not ended yet.
-	 *
 	 * `reader` and `ender` callbacks can return a promise to indicate when the
 	 * value or end-of-stream condition has been completely processed. This
 	 * ensures that a fast writer can never overload a slow reader, and is
 	 * called 'backpressure'.
+	 *
+	 * The `reader` callback is never called while its previously returned
+	 * promise is still pending, and the `ender` callback is likewise only
+	 * called after all reads have completed.
 	 *
 	 * The corresponding `write()` or `end()` operation is blocked until the
 	 * value returned from the reader or ender callback is resolved. If the
 	 * callback throws an error or the returned promise resolves to a rejection,
 	 * the `write()` or `end()` will be rejected with it.
 	 *
-	 * All callbacks are always called asynchronously (i.e. some time
-	 * after `forEach()`, `write()`, `end()` or `abort()` returns), and their
-	 * `this` argument will be undefined.
+	 * All callbacks are always called asynchronously (i.e. some time after
+	 * `forEach()`, `write()`, `end()` or `abort()` returns), and their `this`
+	 * argument will be undefined.
 	 *
-	 * The `reader` and `ender` callbacks are never called again before their
-	 * previously returned promise is resolved/rejected.
+	 * `aborter` is called once if the stream is aborted and has not ended yet.
+	 * (I.e. it will be called if e.g. `ender`'s returned promise is still
+	 * pending, to allow early termination, but it will no longer be called
+	 * if its promise has resolved).
 	 *
 	 * The `aborter` callback can be called while a reader callback's promise is
 	 * still pending, and should try to let `reader` or `ender` finish as fast
-	 * as possible. It will not be called after the output of `ender` has
-	 * resolved.
+	 * as possible.
+	 *
+	 * Note that even when a stream is aborted, it still needs to be `end()`'ed
+	 * correctly.
 	 *
 	 * If no `ender` is given, a default end handler is installed that directly
 	 * acknowledges the end-of-stream, also in case of an error. Note that that
 	 * error will still be returned from `forEach()`.
 	 *
+	 * If no `aborter` is given, an abort is ignored (but will still cause
+	 * further writes to fail, and it will be reflected in the returned promise).
+	 *
+	 * It is an error to call `forEach()` multiple times, and it is not possible
+	 * to 'detach' already attached callbacks. Reason is that the exact behaviour
+	 * of such actions (e.g. block or simply ignore further writes) is application
+	 * dependent, and should be implemented as a transform instead.
+	 *
 	 * The return value of `forEach()` is `result()`, a promise that resolves
 	 * when all parts in the stream(-chain) have completely finished.
-	 *
-	 * It is an error to call `forEach()` multiple times.
 	 *
 	 * @param reader  Callback called with every written value
 	 * @param ender   Optional callback called when stream is ended
 	 * @param aborter Optional callback called when stream is aborted
-	 * @return Stream's end result (i.e. `result()`)
+	 * @return Promise for completely finished stream, i.e. same promise as `result()`
 	 */
 	forEach(
 		reader: (value: T) => void|PromiseLike<void>,
@@ -173,9 +186,12 @@ export interface Writable<T> extends Common<T> {
 	 * streams have completed by e.g. passing that upstream's `result()` as the
 	 * second argument to `end()`.
 	 *
+	 * Note: even if a stream is aborted, it is still necessary to call `end()`
+	 * to allow any resources to correctly be cleaned up.
+	 *
 	 * @param  error Optional Error to pass to `forEach()` end handler
 	 * @param  result Optional promise that determines final value of `result()`
-	 * @return Void-promise that resolves when end-handler has processed the
+	 * @return Void-promise that resolves when `ended`-handler has processed the
 	 *         end-of-stream
 	 */
 	end(error?: Error, result?: PromiseLike<void>): Promise<void>;
@@ -570,6 +586,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			// error to forget to return a value, and it's arguable whether it's
 			// useful to have a stream of void's, so let's prevent it for now.
 			// NOTE: This behaviour may change in the future
+			// NOTE: writeEach() currently DOES use `undefined` to signal EOF
 			// TODO: prevent writing a void PromiseLike too?
 			return Promise.reject(
 				new TypeError("cannot write void value, use end() to end the stream")
@@ -604,9 +621,12 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * streams have completed by e.g. passing that upstream's `result()` as the
 	 * second argument to `end()`.
 	 *
+	 * Note: even if a stream is aborted, it is still necessary to call `end()`
+	 * to allow any resources to correctly be cleaned up.
+	 *
 	 * @param  error Optional Error to pass to `forEach()` end handler
 	 * @param  result Optional promise that determines final value of `result()`
-	 * @return Void-promise that resolves when end-handler has processed the
+	 * @return Void-promise that resolves when `ended`-handler has processed the
 	 *         end-of-stream
 	 */
 	public end(error?: Error, endedResult?: PromiseLike<void>): Promise<void> {
@@ -641,39 +661,55 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * `ender` is called once, when the writer `end()`s the stream, either with
 	 * or without an error.
 	 *
-	 * `aborter` is called once if the stream is aborted and has not ended yet.
-	 *
 	 * `reader` and `ender` callbacks can return a promise to indicate when the
 	 * value or end-of-stream condition has been completely processed. This
 	 * ensures that a fast writer can never overload a slow reader, and is
 	 * called 'backpressure'.
+	 *
+	 * The `reader` callback is never called while its previously returned
+	 * promise is still pending, and the `ender` callback is likewise only
+	 * called after all reads have completed.
 	 *
 	 * The corresponding `write()` or `end()` operation is blocked until the
 	 * value returned from the reader or ender callback is resolved. If the
 	 * callback throws an error or the returned promise resolves to a rejection,
 	 * the `write()` or `end()` will be rejected with it.
 	 *
-	 * All callbacks are always called asynchronously (i.e. some time
-	 * after `forEach()`, `write()`, `end()` or `abort()` returns), and their
-	 * `this` argument will be undefined.
+	 * All callbacks are always called asynchronously (i.e. some time after
+	 * `forEach()`, `write()`, `end()` or `abort()` returns), and their `this`
+	 * argument will be undefined.
 	 *
-	 * The `reader` and `ender` callbacks are never called again before their
-	 * previously returned promise is resolved/rejected.
+	 * `aborter` is called once if the stream is aborted and has not ended yet.
+	 * (I.e. it will be called if e.g. `ender`'s returned promise is still
+	 * pending, to allow early termination, but it will no longer be called
+	 * if its promise has resolved).
 	 *
 	 * The `aborter` callback can be called while a reader callback's promise is
 	 * still pending, and should try to let `reader` or `ender` finish as fast
-	 * as possible. It will not be called after the output of `ender` has
-	 * resolved.
+	 * as possible.
+	 *
+	 * Note that even when a stream is aborted, it still needs to be `end()`'ed
+	 * correctly.
+	 *
 	 * If no `ender` is given, a default end handler is installed that directly
 	 * acknowledges the end-of-stream, also in case of an error. Note that that
 	 * error will still be returned from `forEach()`.
 	 *
+	 * If no `aborter` is given, an abort is ignored (but will still cause
+	 * further writes to fail, and it will be reflected in the returned promise).
 	 *
-	 * It is an error to call `forEach()` multiple times.
+	 * It is an error to call `forEach()` multiple times, and it is not possible
+	 * to 'detach' already attached callbacks. Reason is that the exact behaviour
+	 * of such actions (e.g. block or simply ignore further writes) is application
+	 * dependent, and should be implemented as a transform instead.
+	 *
+	 * The return value of `forEach()` is `result()`, a promise that resolves
+	 * when all parts in the stream(-chain) have completely finished.
 	 *
 	 * @param reader  Callback called with every written value
 	 * @param ender   Optional callback called when stream is ended
 	 * @param aborter Optional callback called when stream is aborted
+	 * @return Promise for completely finished stream, i.e. same promise as `result()`
 	 */
 	public forEach(
 		reader: (value: T) => void|PromiseLike<void>,
@@ -712,9 +748,10 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * Any pending and future `write()`s after that will be rejected with the
 	 * given error.
 	 *
-	 * The stream is not ended until the writer explicitly `end()`s the stream,
-	 * after which the stream's `ender` callback is called with the abort error
-	 * (i.e. any error passed to `end()` is ignored).
+	 * It is still necessary to explicitly `end()` the stream, after which the
+	 * stream's `ender` callback is called with the abort error (i.e. any error
+	 * passed to `end()` is ignored). This ensures any resources can be cleaned
+	 * up correctly (both on reader and writer side).
 	 *
 	 * The abort is ignored if the stream is already aborted.
 	 * Note that it's possible to abort an ended stream, to allow the abort to
