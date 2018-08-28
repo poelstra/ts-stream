@@ -405,11 +405,6 @@ export interface WritableStream<T> extends Writable<T>, CommonStream<T> {
 	 * returning a rejection, or the write call failing), the stream is aborted
 	 * and ended with that error.
 	 *
-	 * If ending of the stream fails with an error other than the abort error,
-	 * the program is terminated with an UnhandledEndError.
-	 *
-	 * NOTE Whether stream is aborted on error is still subject to change.
-	 *
 	 * @param writer Called when the next value can be written to the stream,
 	 *               should return (a promise for) a value to be written,
 	 *               or `undefined` (or void promise) to end the stream.
@@ -1078,11 +1073,6 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * If writing of a value fails (either by the callback throwing an error,
 	 * returning a rejection, or the write call failing), the stream is aborted
 	 * and ended with that error.
-	 *
-	 * If ending of the stream fails with an error other than the abort error,
-	 * the program is terminated with an UnhandledEndError.
-	 *
-	 * NOTE Whether stream is aborted on error is still subject to change.
 	 *
 	 * @param writer Called when the next value can be written to the stream,
 	 *               should return (a promise for) a value to be written,
