@@ -385,6 +385,12 @@ describe("Stream", () => {
 			expect(abortResult).to.equal(null);
 			expect(ab.reason).to.equal(abortError);
 		});
+		it("supports being called without a reason", async () => {
+			s.abort();
+			const p = track(s.aborted());
+			await p.promise.then(noop, noop);
+			expect(p.reason).to.be.instanceof(Error);
+		});
 	}); // abort()
 
 	describe("aborted()", () => {

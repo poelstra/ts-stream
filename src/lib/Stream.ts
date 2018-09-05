@@ -56,9 +56,9 @@ export interface Common<T> {
 	 * 'bubble' to other parts in a chain of streams, which may not have ended
 	 * yet. It will not change the end-state of this part of the stream though.
 	 *
-	 * @param reason Error value to signal a reason for the abort
+	 * @param reason Optional Error value to signal a reason for the abort
 	 */
-	abort(reason: Error): void;
+	abort(reason?: Error): void;
 
 	/**
 	 * Obtain promise that resolves to a rejection when `abort()` is called.
@@ -753,11 +753,14 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * 'bubble' to other parts in a chain of streams, which may not have ended
 	 * yet. It will not change the end-state of this part of the stream though.
 	 *
-	 * @param reason Error value to signal a reason for the abort
+	 * @param reason Optional Error value to signal a reason for the abort
 	 */
-	public abort(reason: Error): void {
+	public abort(reason?: Error): void {
 		if (this._abortPromise) {
 			return;
+		}
+		if (!reason) {
+			reason = new Error("aborted");
 		}
 		this._abortDeferred.reject(reason);
 		this._abortPromise = this._abortDeferred.promise;
