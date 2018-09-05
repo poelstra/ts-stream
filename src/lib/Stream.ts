@@ -408,7 +408,7 @@ export interface WritableStream<T> extends Writable<T>, CommonStream<T> {
 	 * @param writer Called when the next value can be written to the stream,
 	 *               should return (a promise for) a value to be written,
 	 *               or `undefined` (or void promise) to end the stream.
-	 * @return Stream for all values in the input array
+	 * @return Promise for completely finished stream, i.e. same promise as `result()`
 	 */
 	writeEach(writer: () => T|PromiseLike<T>|void|PromiseLike<void>): Promise<void>;
 
@@ -1080,7 +1080,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param writer Called when the next value can be written to the stream,
 	 *               should return (a promise for) a value to be written,
 	 *               or `undefined` (or void promise) to end the stream.
-	 * @return Stream for all values in the input array
+	 * @return Promise for completely finished stream, i.e. same promise as `result()`
 	 */
 	public writeEach(writer: () => T|PromiseLike<T>|void|PromiseLike<void>): Promise<void> {
 		this.aborted().catch((abortError) => {
