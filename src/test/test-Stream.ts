@@ -1272,6 +1272,12 @@ describe("Stream", () => {
 			expect(forEachResult.reason).to.equal(abortError);
 			expect(writeResult.reason).to.equal(abortError);
 		});
+
+		it("asynchronously calls writer", async () => {
+			let called = false;
+			s.writeEach(() => { called = true; });
+			expect(called).to.equal(false);
+		});
 	}); // writeEach()
 
 	describe("from()", () => {

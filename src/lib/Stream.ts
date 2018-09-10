@@ -1088,21 +1088,19 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			// result() too
 			swallowErrors(this.end(abortError));
 		});
-		let loop = (): void|Promise<void> => {
-			if (this._abortPromise) {
-				// Don't call writer when aborted
-				return;
-			}
-			let valuePromise = writer();
-			return Promise.resolve<T|void>(valuePromise).then((value?: T) => {
+		const worker = async () => {
+			while (!this._abortPromise) {
+				const value = await writer();
 				if (value === undefined) {
-					return this.end();
+					await this.end();
+					break;
 				} else {
-					return this.write(value).then(loop);
+					await this.write(value as T);
 				}
-			});
+			}
 		};
-		Promise.resolve().then(loop).then(undefined, (error: Error) => this.abort(error));
+		// Asynchronously call worker, abort on error
+		Promise.resolve().then(worker).catch((error: Error) => this.abort(error));
 		return this.result();
 	}
 
