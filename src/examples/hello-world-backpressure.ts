@@ -10,7 +10,10 @@ import Stream from "../lib/index";
 import {delay} from "../lib/util";
 
 Stream.from([1, 2, 3, 4])
-	.map((n) => Promise.resolve(n * 2).then((k) => delay(1000, k)))
+	.map(async (n) => {
+		await delay(1000);
+		return n * 2;
+	})
 	.forEach((n) => console.log(n));
 
 // 2, 4, 6, 8 (with pauses of a second)
