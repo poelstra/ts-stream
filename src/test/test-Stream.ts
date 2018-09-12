@@ -1278,6 +1278,108 @@ describe("Stream", () => {
 			s.writeEach(() => { called = true; });
 			expect(called).to.equal(false);
 		});
+
+		it("waits for writer to finish after abort before calling ender", async () => {
+			swallowErrors(s.aborted());
+			const d = defer();
+			let called = false;
+			swallowErrors(s.writeEach(
+				() => d.promise,
+				() => { called = true; }
+			));
+			await delay(1); // ensure writer is called
+			s.abort();
+			await delay(1);
+			expect(called).to.equal(false);
+			d.resolve();
+			await delay(1);
+			expect(called).to.equal(true);
+		});
+
+		it("calls ender without arguments after stream ends", async () => {
+			let called = false;
+			s.forEach(noop); // flush stream
+			await s.writeEach(
+				() => undefined,
+				(...args) => { expect(args.length).to.equal(0); called = true; }
+			);
+			expect(called).to.equal(true);
+		});
+
+		it("calls ender with abort error when writer throws", async () => {
+			let called = false;
+			s.forEach(noop); // flush stream
+			const writeEachResult = s.writeEach(
+				() => { throw new Error("boom"); },
+				(err) => { expect(err.message).to.equal("boom"); called = true; }
+			);
+			await writeEachResult.catch(noop);
+			expect(called).to.equal(true);
+		});
+
+		it("calls aborter with writer error", async () => {
+			let called = false;
+			s.forEach(noop); // flush stream
+			const writeEachResult = s.writeEach(
+				() => { throw new Error("boom"); },
+				noop,
+				(err) => { expect(err.message).to.equal("boom"); called = true; }
+			);
+			await writeEachResult.catch(noop);
+			expect(called).to.equal(true);
+		});
+
+		it("calls aborter with writer error", async () => {
+			let called = false;
+			swallowErrors(s.aborted());
+			s.forEach(noop); // flush stream
+			const writeEachResult = s.writeEach(
+				() => { throw new Error("boom"); },
+				noop,
+				(err) => { expect(err.message).to.equal("boom"); called = true; }
+			);
+			await writeEachResult.catch(noop);
+			expect(called).to.equal(true);
+		});
+
+		it("calls aborter once even when writer is still pending", async () => {
+			swallowErrors(s.aborted());
+			const d = defer();
+			let enderCalled = 0;
+			let aborterCalled = 0;
+			swallowErrors(s.writeEach(
+				() => d.promise,
+				() => { enderCalled++; },
+				() => { aborterCalled++; }
+			));
+			await delay(1); // ensure writer is called
+			s.abort();
+			await delay(1);
+			expect(enderCalled).to.equal(0);
+			expect(aborterCalled).to.equal(1);
+			d.reject(new Error("boom"));
+			await delay(1);
+			expect(enderCalled).to.equal(1);
+			expect(aborterCalled).to.equal(1);
+		});
+
+		it("calls aborter once even when ender has ended", async () => {
+			swallowErrors(s.aborted());
+			let enderCalled = 0;
+			let aborterCalled = 0;
+			swallowErrors(s.writeEach(
+				() => undefined,
+				() => { enderCalled++; },
+				() => { aborterCalled++; }
+			));
+			await delay(1); // ensure writer is called
+			expect(enderCalled).to.equal(1);
+			expect(aborterCalled).to.equal(0);
+			s.abort();
+			await delay(1);
+			expect(enderCalled).to.equal(1);
+			expect(aborterCalled).to.equal(1);
+		});
 	}); // writeEach()
 
 	describe("from()", () => {

@@ -71,6 +71,18 @@ export interface Common<T> {
 	 * @return Promise that is rejected with abort error when stream is aborted
 	 */
 	aborted(): Promise<never>;
+
+	/**
+	 * Obtain promise that resolves to a rejection when `abort()` is called.
+	 *
+	 * Useful to pass abort to upstream sources.
+	 *
+	 * Note: this promise either stays pending, or is rejected. It is never
+	 * fulfilled.
+	 *
+	 * @return Promise that is rejected with abort error when stream is aborted
+	 */
+	aborted(aborter: (reason: Error) => void): void;
 }
 
 /**
@@ -396,21 +408,62 @@ export interface WritableStream<T> extends Writable<T>, CommonStream<T> {
 	/**
 	 * Repeatedly call `writer` and write its returned value (or promise for it)
 	 * to the stream.
-	 * The stream is ended when `writer` returns `undefined`.
+	 * The stream is ended when `writer` returns `undefined` (or a promise that
+	 * resolves to `undefined`).
 	 *
-	 * `writer` is only called when its previously returned value has been
+	 * `writer` is only called again when its previously returned value has been
 	 * processed by the stream.
 	 *
-	 * If writing of a value fails (either by the callback throwing an error,
+	 * If writing of a value fails (either by the `writer` throwing an error,
 	 * returning a rejection, or the write call failing), the stream is aborted
 	 * and ended with that error.
+	 *
+	 * `ender` is always called once, just before the stream is ended. I.e.
+	 * after `writer` returned (a promise for) `undefined` or the stream is
+	 * aborted.
+	 * It can be used to e.g. close a resource such as a database.
+	 * Note: `ender` will only be called when `writer`'s promise (if any) has
+	 * resolved.
+	 *
+	 * `aborter` is called once iff the stream is aborted. It can be called
+	 * while e.g. a promise returned from the writer or ender is still pending,
+	 * and can be used to make sure that that promise is resolved/rejected
+	 * sooner.
+	 * Note: the aborter should be considered a 'signal to abort', but cleanup
+	 * of resources should be done in the `ender` (i.e. it cannot return a
+	 * promise).
+	 * It can be called (long) after `ender` has been called, because a stream
+	 * can be aborted even after it is already ended, which is useful if this
+	 * stream element is part of a larger chain of streams.
+	 * An aborter must never throw an error.
 	 *
 	 * @param writer Called when the next value can be written to the stream,
 	 *               should return (a promise for) a value to be written,
 	 *               or `undefined` (or void promise) to end the stream.
+	 *               Will always be called asynchronously.
+	 * @param ender Optional callback called once after `writer` indicated
+	 *              end-of-stream, or when the stream is aborted (and
+	 *              previously written value resolved/rejected). It's called
+	 *              without an argument if stream was not aborted (yet), and
+	 *              the abort reason if it was aborted (`aborter` will have
+	 *              been called, too). Will always be called asynchronously.
+	 * @param aborter Optional callback called once when stream is aborted.
+	 *                Receives abort reason as its argument. Should be used
+	 *                to prematurely terminate any pending promises of
+	 *                `writer` or `ender`. Will always be called
+	 *                asynchronously. Can be called before and after
+	 *                `writer` or `ender` have been called, even when `ender`
+	 *                is completely finished (useful to e.g. abort other streams, which may
+	 *                not be aborted yet).
+	 *                Must not throw any errors, will lead to unhandled
+	 *                rejected promise if it does.
 	 * @return Promise for completely finished stream, i.e. same promise as `result()`
 	 */
-	writeEach(writer: () => T|PromiseLike<T>|void|PromiseLike<void>): Promise<void>;
+	writeEach(
+		writer: () => T|undefined|void|PromiseLike<T|undefined|void>,
+		ender?: (abortReason?: Error) => void|PromiseLike<void>,
+		aborter?: (abortReason: Error) => void,
+	): Promise<void>;
 
 	// TODO Experimental
 	// TODO Not sure whether a 'reverse' function confuses more than it helps
@@ -1068,39 +1121,126 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	/**
 	 * Repeatedly call `writer` and write its returned value (or promise for it)
 	 * to the stream.
-	 * The stream is ended when `writer` returns `undefined`.
+	 * The stream is ended when `writer` returns `undefined` (or a promise that
+	 * resolves to `undefined`).
 	 *
-	 * `writer` is only called when its previously returned value has been
+	 * `writer` is only called again when its previously returned value has been
 	 * processed by the stream.
 	 *
-	 * If writing of a value fails (either by the callback throwing an error,
+	 * If writing of a value fails (either by the `writer` throwing an error,
 	 * returning a rejection, or the write call failing), the stream is aborted
 	 * and ended with that error.
+	 *
+	 * `ender` is always called once, just before the stream is ended. I.e.
+	 * after `writer` returned (a promise for) `undefined` or the stream is
+	 * aborted.
+	 * It can be used to e.g. close a resource such as a database.
+	 * Note: `ender` will only be called when `writer`'s promise (if any) has
+	 * resolved.
+	 *
+	 * `aborter` is called once iff the stream is aborted. It can be called
+	 * while e.g. a promise returned from the writer or ender is still pending,
+	 * and can be used to make sure that that promise is resolved/rejected
+	 * sooner.
+	 * Note: the aborter should be considered a 'signal to abort', but cleanup
+	 * of resources should be done in the `ender` (i.e. it cannot return a
+	 * promise).
+	 * It can be called (long) after `ender` has been called, because a stream
+	 * can be aborted even after it is already ended, which is useful if this
+	 * stream element is part of a larger chain of streams.
+	 * An aborter must never throw an error.
 	 *
 	 * @param writer Called when the next value can be written to the stream,
 	 *               should return (a promise for) a value to be written,
 	 *               or `undefined` (or void promise) to end the stream.
+	 *               Will always be called asynchronously.
+	 * @param ender Optional callback called once after `writer` indicated
+	 *              end-of-stream, or when the stream is aborted (and
+	 *              previously written value resolved/rejected). It's called
+	 *              without an argument if stream was not aborted (yet), and
+	 *              the abort reason if it was aborted (`aborter` will have
+	 *              been called, too). Will always be called asynchronously.
+	 * @param aborter Optional callback called once when stream is aborted.
+	 *                Receives abort reason as its argument. Should be used
+	 *                to prematurely terminate any pending promises of
+	 *                `writer` or `ender`. Will always be called
+	 *                asynchronously. Can be called before and after
+	 *                `writer` or `ender` have been called, even when `ender`
+	 *                is completely finished (useful to e.g. abort other streams, which may
+	 *                not be aborted yet).
+	 *                Must not throw any errors, will lead to unhandled
+	 *                rejected promise if it does.
 	 * @return Promise for completely finished stream, i.e. same promise as `result()`
 	 */
-	public writeEach(writer: () => T|PromiseLike<T>|void|PromiseLike<void>): Promise<void> {
-		this.aborted().catch((abortError) => {
-			// Swallow errors from the end call, as they will be reflected in
-			// result() too
-			swallowErrors(this.end(abortError));
-		});
+	public writeEach(
+		writer: () => T|undefined|void|PromiseLike<T|undefined|void>,
+		ender?: (abortReason?: Error) => void|PromiseLike<void>,
+		aborter?: (abortReason: Error) => void,
+	): Promise<void> {
+		/**
+		 * Call aborter (if any) and convert any thrown error into
+		 * unhandled rejection. Unset aborter to prevent calling it
+		 * again later.
+		 */
+		const callAborter = (abortReason: Error) => {
+			if (!aborter) {
+				return;
+			}
+			try {
+				const callback = aborter;
+				aborter = undefined;
+				callback(this._abortReason);
+			} catch (aborterError) {
+				// Convert into unhandled rejection. There's not really
+				// a sensible way to convert it into something else.
+				// One might think to pass it to the ender, which may
+				// be undefined, or this.end(), but that seams rather
+				// unexpected to occassionally have to handle an error
+				// from one specific aborter, whereas other aborters's
+				// errors will also lead to unhandled rejections.
+				// Note: the most sensible thing to do now, is to
+				// terminate the program.
+				Promise.reject(aborterError);
+			}
+		};
 		const worker = async () => {
-			while (!this._abortPromise) {
-				const value = await writer();
-				if (value === undefined) {
-					await this.end();
-					break;
-				} else {
-					await this.write(value as T);
+			try {
+				while (!this._abortPromise) {
+					const value = await writer();
+					if (value === undefined) {
+						break;
+					} else {
+						await this.write(value);
+					}
 				}
+			} catch (writeError) {
+				this.abort(writeError);
+			} finally {
+				// If our writer caused the abort, make sure to
+				// call ender (and aborter) with that reason. Other aborts
+				// may happen at any time, so they may be caught by this,
+				// or they may be caught by the out-of-loop asynchronous
+				// callback registered below.
+				let endError = this._abortReason; // Will be `undefined` in normal cases
+				if (this._abortReason) {
+					callAborter(this._abortReason);
+				}
+
+				if (ender) {
+					try {
+						await (this._abortReason ? ender(this._abortReason) : ender());
+					} catch (error) {
+						endError = error;
+					}
+				}
+
+				await this.end(endError);
 			}
 		};
 		// Asynchronously call worker, abort on error
 		Promise.resolve().then(worker).catch((error: Error) => this.abort(error));
+		// Ensure aborter is asynchronously called if necessary
+		this.aborted().catch(callAborter);
 		return this.result();
 	}
 
