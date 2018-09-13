@@ -8,7 +8,7 @@
 import "source-map-support/register";
 import { expect } from "chai";
 
-import { Stream, ReadableStream, WritableStream } from "../lib/index";
+import { Stream, ReadableStream, WritableStream, Readable, Writable, Transform } from "../lib/index";
 import { delay, settle, noop } from "./util";
 
 enum MockDatabaseState {
@@ -177,6 +177,42 @@ async function idiomaticManualSource<T>(db: MockDatabase<T>, destination: Stream
 	await destination.end(endError);
 }
 
+/**
+ * Simple transform.
+ *
+ * Correctly handles backpressure, and makes sure to pass aborts along to
+ * other elements in the chain. Ensures final stream captures result of all
+ * previous streams.
+ */
+function createTransform<T, R>(transformer: (value: T) => R | PromiseLike<R>): Transform<T, R> {
+	return function idiomaticTransform(
+		readable: Readable<T>,
+		writable: Writable<R>,
+	): void {
+		// 1. Ensure aborts bubble from upstream to downstream
+		writable.aborted().catch((err) => readable.abort(err));
+
+		readable.forEach(
+			// 2. Read all values from source stream, apply transformation
+			(v: T) => writable.write(transformer(v)),
+
+			// 3. Always end destination stream, even when there was an
+			// error. Also, pass final result of upstream (i.e.
+			// `readable.result()`) to downstream.
+			(error?: Error) => writable.end(error, readable.result()),
+
+			(abortReason: Error): void => {
+				// 4. Ensure aborts bubble from downstream to upstream
+				writable.abort(abortReason);
+
+				// 5. Optionally cancel any pending operation.
+				// Note: this can be called even long after the stream
+				// has ended, and must never throw an error.
+			}
+		);
+	}
+}
+
 describe("idiomatic examples", () => {
 	it("supports trivial example", async () => {
 		const s = Stream.from([1, 2, 3, 4]);
@@ -260,4 +296,14 @@ describe("idiomatic examples", () => {
 			}); // describe ${testSource.name} -> ${testSink.name}
 		}
 	}
+
+	describe("transform", () => {
+		it("supports idiomatic transform", async () => {
+			const source = Stream.from([1, 2, 3, 4]);
+			const timesTwo = (n: number) => n * 2;
+			const transformed = source.transform(createTransform(timesTwo));
+			const result = await transformed.toArray();
+			expect(result).to.deep.equal([2, 4, 6, 8]);
+		});
+	});
 });
