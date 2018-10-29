@@ -3,8 +3,8 @@
 TS-Stream provides type-safe object streams with seamless support for
 backpressure, ending, and error handling.
 
-It can be used as an easy-to-use alternative to e.g. Node's object-mode Streams,
-both in 'plain' Javascript and TypeScript.
+It can be used as a reliable and easy-to-use alternative to e.g. Node's
+object-mode Streams, both in 'plain' Javascript and TypeScript.
 
 Features:
 - Type-safe (TypeScript)
@@ -13,6 +13,7 @@ Features:
 - More options for error handling
 - Support for stream aborting
 - Support for EOF (with or without error)
+- Clear and deterministic behavior in case of early stream end and/or errors
 
 # Usage and examples
 
@@ -43,8 +44,8 @@ var Stream = require("ts-stream").Stream; // CommonJS style
 If you use TypeScript, use `"moduleResolution": "node"` in your `tsconfig.json`
 to let it automatically pick up the typings of this package.
 
-Some examples below use Promises, for which you can use any Promises/A+
-compliant library, or native Promises if available.
+Some examples below use Promises, for which you can use native Promises,
+or any Promises/A+ compliant library.
 
 ## Simple mapping transform
 
@@ -165,12 +166,12 @@ Errors generated in `forEach()`'s read handler are 'returned' to the correspondi
 `write()` or `end()` call.
 To signal an error from the write-side to the forEach-side, you can `end()` the
 stream with an error, causing the end handler of `forEach()` to be called with
-that error.
+that error (after pending writes have completed).
 
 For example, in a mapping transform, if the map callback throws an error (or
 returns a rejected promise), this error is 'reflected' back to the write that
 caused that callback to be called.
-This allows the writer to decide to simply write another value, end the stream,
+This allows the writer to decide to simply write another value, or end the stream,
 etc.
 
 Consider the following stream which produces the values 0, 1, 2, and a mapper
@@ -212,9 +213,7 @@ source.write(1).then(() => console.log("write 1 ok"), (err) => console.log("writ
 source.write(2).then(() => console.log("write 2 ok"), (err) => console.log("write 2 error", err));
 source.end(new Error("oops")).then(() => console.log("write end ok"), (err) => console.log("write end error", err));
 
-var mapped = source.map((n) => {
-	return n * 2;
-});
+var mapped = source.map((n) => n * 2);
 
 mapped.forEach((n) => console.log("read", n), (err) => console.log("read end", err || "ok"));
 ```
@@ -230,6 +229,25 @@ read end [Error: oops]
 write end ok
 ```
 
+## Aborting
+
+Aborting a stream causes a 'signal' to be sent in all directions of a stream.
+This means it's possible to call `abort()` on any element in a chain of
+streams: it will flow to both ends of the chain.
+
+It signals the source-side to stop producing values. A source *must* always
+still properly end the stream, e.g. with an error. This ensures that e.g. a
+source has time to close a database handle before calling `end()`.
+It is an error for a source to write new values after it has been aborted.
+
+It also signals the sink-side to e.g. cancel its write as soon as possible,
+which could include aborting a database transaction, destroying a socket, etc.
+Because the source always has to end the stream, the sink's end callback will
+always still be called (if it wasn't called already), the sink can still
+correctly indicate when it has completely finalized its processing (e.g.
+waiting until any pending data has been written to disk and file handle is
+closed).
+
 # Implementing your own transforms and endpoints
 
 Remember that many transforms can be simplified to a combination of the existing
@@ -237,10 +255,49 @@ Remember that many transforms can be simplified to a combination of the existing
 
 Nevertheless, writing your own transforms (e.g. adapters to other types of
 streams) is not much more than using `forEach()`, `writeEach()` or explicit
-`write()`/`end()` calls.
+`write()` / `end()` calls.
 
-See the source of `lib/Transform.ts` and `lib/node.ts` for inspiration,
-including how to correctly handle the tricky combination of errors, abort, etc.
+Important:
+- Always `end()` a stream, even if it is aborted. In most cases, it makes
+  sense to pass the abort reason to `end()`. Note: `writeEach()` handles this
+  for you automatically.
+- When in the middle of a stream, be sure to pass the source stream's `result()`
+  to the destination stream's `end()`'s second parameter, to ensure its result
+  correctly waits for the source stream's result.
+
+Example of a 'times two' transformation from `source` to `dest`:
+
+```ts
+const source = new Stream();
+const dest = new Stream();
+
+// 1. Ensure aborts bubble from upstream to downstream
+dest.aborted().catch((err) => source.abort(err));
+
+source.forEach(
+  // 2. Read all values from source stream, apply transformation
+  (v) => dest.write(v * 2),
+
+  // 3. Always end destination stream, even when there was an
+  // error. Also, pass final result of upstream (i.e.
+  // `source.result()`) to downstream.
+  (error?: Error) => dest.end(error, source.result()),
+
+  (abortReason: Error): void => {
+    // 4. Ensure aborts bubble from downstream to upstream
+    dest.abort(abortReason);
+
+    // 5. Optionally cancel any pending operation.
+    // Note: this can be called even long after the stream
+    // has ended, and must never throw an error.
+  }
+);
+```
+
+If you want to implement a custom transformation (e.g. generic map), that
+receives arbitrary callbacks from a user which may also fail: see the source
+of `lib/Transform.ts` and `lib/node.ts` for inspiration, including how to
+correctly handle the combination of these errors, aborts, etc.
 
 # Documentation
 
@@ -250,12 +307,15 @@ editor with Typescript support, you'll get instant inline documentation.
 An automatically generated online version of this documentation is still on
 the TODO...
 
-# Notes
+# Notes, tips & tricks
 
+- Remember to always `end()` a stream, even when it is `abort()`'ed.
 - To wait until all elements in a stream pipeline have completely finished
   simply wait for any element's `result()` (instead of `end()`, especially in
-  the middle of a pipeline).
-  Note that `forEach()` also returns `result()` for your convenience.
+  the middle of a pipeline). This ensures that both the source and sink side
+  have had the time to e.g. close resources.
+  Note that `writeEach()` and `forEach()` also return `result()` for your
+  convenience.
 - Only one 'reader' can be attached to a stream: an explicit 'splitter' is
   needed to stream to multiple destinations. This is considered a feature,
   as different choices can be made for when to start streaming, how to handle
@@ -264,12 +324,11 @@ the TODO...
   feedback on EOF, nor does it e.g. automatically handle errors during map.
   If such behavior is needed, it is fairly easy to convert from `forEach()` to
   an iterator.
-- There is 'asymmetry' between e.g. `write()` and `forEach()` (i.e. there's no
-  `read()` that reads a single value). Main reason is that there needs to be a
-  single call to an end/error handler (because errors returned by it must
-  somehow be handled, in this case by the corresponding `write()`/`end()` call),
-  and having the read and end handlers in different calls lead to an awkward
-  interface.
+- Similarly, there is no `read()` that reads a single value. Main reason is
+  that there needs to be a single call to an end/error handler (because errors
+  returned by it must somehow be handled, in this case by the corresponding
+  `write()` / `end()` call), and having the read and end handlers in different
+  calls led to an awkward interface.
 
 # Status
 
@@ -281,15 +340,9 @@ A number of small TODO's in the code need some love.
 A number of methods are still marked as experimental (and basically undocumented
 nor unit-tested). They need to be refined (probably by making a few examples
 with them) or removed.
-Also some smaller things may change, such as the 'grouping'/naming of certain
-functionality (especially Stream and Transform and their `map` etc).
 
 # TODO
 
-- More and better documentation, mostly updating the examples and including
-  docs on abort handling, error best-practices, etc.
-- More unit tests, cleanup of existing ones (all 'core' functionality is already
-  100% covered except filter(), aiming for 100% coverage though)
 - Set of 'standard' Transforms like Merge, Split, Queue, Batch, Limit, etc.
 - Wrappers for Node streams (some already done), iterators, etc.
 - Support transducers (if possible: need backpressure)
