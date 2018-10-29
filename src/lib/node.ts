@@ -26,7 +26,7 @@ import { defer, swallowErrors, VoidDeferred } from "./util";
  * @see `pipeToNodeStream()` for easier error and completion handling.
  */
 export class NodeReadable<T> extends NodeStream.Readable {
-	private _resumer: (value?: void|PromiseLike<void>) => void;
+	private _resumer?: (value?: void|PromiseLike<void>) => void;
 
 	/**
 	 * Create new NodeJS Readable based on given ts-stream Readable.
@@ -138,7 +138,7 @@ export function pipeToNodeStream<T>(
 	emitError: boolean = false
 ): Promise<void> {
 	const endDeferred = defer();
-	let blockedDeferred: VoidDeferred;
+	let blockedDeferred: VoidDeferred | undefined;
 
 	// Handle errors emitted by node stream: abort ts-stream
 	function handleNodeStreamError(error: Error): void {

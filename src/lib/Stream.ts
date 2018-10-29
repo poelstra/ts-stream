@@ -366,7 +366,44 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 	 * @return Promise for final accumulator.
 	 */
 	reduce<R>(
-		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => R|PromiseLike<R>,
+		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => PromiseLike<R>,
+		initial: R
+	): Promise<R>;
+	/**
+	 * Reduce the stream into a single value by calling a reducer callback for
+	 * each value in the stream. Similar to `Array#reduce()`.
+	 *
+	 * The output of the previous call to `reducer` (aka `accumulator`) is given
+	 * as the first argument of the next call. For the first call, either the
+	 * `initial` value to `reduce()` is passed, or the first value of the stream
+	 * is used (and `current` will be the second value).
+	 *
+	 * The result of `reduce()` is a promise for the last value returned by
+	 * `reducer` (or the initial value, if there were no calls to `reducer`).
+	 * If no initial value could be determined, the result is rejected with a
+	 * TypeError.
+	 * If the stream is ended with an error, the result is rejected with that
+	 * error.
+	 *
+	 * It is possible for `reducer` to return a promise for its result.
+	 *
+	 * If the `reducer` throws an error or returns a rejected promise, the
+	 * originating `write()` will fail with that error.
+	 *
+	 * Examples:
+	 * s.reduce((acc, val) => acc + val); // sums all values
+	 * s.reduce((acc, val) => { acc.push(val); return acc; }, []); // toArray()
+	 *
+	 * @param  reducer Callback called for each value in the stream, with
+	 *                 accumulator, current value, index of current value, and
+	 *                 this stream.
+	 * @param  initial Optional initial value for accumulator. If no initial
+	 *                 value is given, first value of stream is used.
+	 * @return Promise for final accumulator.
+	 */
+	reduce<R>(
+		// tslint:disable-next-line:unified-signatures
+		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => R,
 		initial: R
 	): Promise<R>;
 
@@ -546,7 +583,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * Read handler that is called for every written value, as set by
 	 * `forEach()`.
 	 */
-	private _reader: (value: T) => void|PromiseLike<void>;
+	private _reader?: (value: T) => void|PromiseLike<void>;
 
 	/**
 	 * End handler that is called when the stream is ended, as set by
@@ -554,49 +591,49 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * did not supply one.
 	 * Set to 'undefined' when it has been called.
 	 */
-	private _ender: (error?: Error) => void|PromiseLike<void>;
+	private _ender?: (error?: Error) => void|PromiseLike<void>;
 
 	/**
 	 * Abort handler that is called when the stream is aborted, as set by
 	 * `forEach()` (can be undefined).
 	 * Set to 'undefined' when it has been called.
 	 */
-	private _aborter: (error: Error) => void;
+	private _aborter?: (error: Error) => void;
 
 	/**
 	 * When a written value is being processed by the `_reader`, this property
 	 * is set to a promise that resolves when the reader's returned PromiseLike is
 	 * resolved (or rejected).
 	 */
-	private _readBusy: TrackedPromise<void>;
+	private _readBusy?: TrackedPromise<void>;
 
 	/**
 	 * Set to an instance of an Eof object, containing optional error and final
 	 * result of this stream. Set when `end()` is called.
 	 */
-	private _ending: Eof;
+	private _ending?: Eof;
 
 	/**
 	 * Set to an instance of an Eof object, containing optional error and final
 	 * result of this stream. Set when `_ender` is being called but not finished
 	 * yet, unset when `_ended` is set.
 	 */
-	private _endPending: Eof;
+	private _endPending?: Eof;
 
 	/**
 	 * Set to the error passed to `end()` (or the special value `eof`) when the
 	 * stream has ended, and the operation was confirmed by the `_ender`.
 	 */
-	private _ended: Error;
+	private _ended?: Error;
 
 	/**
 	 * Set to a rejected promise when the stream is explicitly `abort()`'ed.
 	 */
-	private _abortPromise: Promise<void>;
+	private _abortPromise?: Promise<void>;
 	/**
 	 * Error given in abort() method
 	 */
-	private _abortReason: Error;
+	private _abortReason?: Error;
 
 	/**
 	 * Resolved to a rejection when `abort()` is called.
@@ -976,7 +1013,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @return Promise for final accumulator.
 	 */
 	public reduce(
-		reducer: (accumulator: T, current: T, index: number, stream: ReadableStream<T>) => T|PromiseLike<T>,
+		reducer: (accumulator: T, current: T, index: number, stream: ReadableStream<T>) => T | PromiseLike<T>,
 		initial?: T
 	): Promise<T>;
 	/**
@@ -1012,7 +1049,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @return Promise for final accumulator.
 	 */
 	public reduce<R>(
-		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => R|PromiseLike<R>,
+		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => PromiseLike<R>,
 		initial: R
 	): Promise<R>;
 	/**
@@ -1048,8 +1085,9 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @return Promise for final accumulator.
 	 */
 	public reduce<R>(
-		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => R|PromiseLike<R>,
-		initial?: R
+		// tslint:disable-next-line:unified-signatures
+		reducer: (accumulator: R, current: T, index: number, stream: ReadableStream<T>) => R,
+		initial: R
 	): Promise<R> {
 		let haveAccumulator = arguments.length === 2;
 		let accumulator: any = initial;
@@ -1189,7 +1227,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			try {
 				const callback = aborter;
 				aborter = undefined;
-				callback(this._abortReason);
+				callback(abortReason);
 			} catch (aborterError) {
 				// Convert into unhandled rejection. There's not really
 				// a sensible way to convert it into something else.
@@ -1210,7 +1248,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 					if (value === undefined) {
 						break;
 					} else {
-						await this.write(value);
+						await this.write(value as T);
 					}
 				}
 			} catch (writeError) {
@@ -1375,7 +1413,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 
 			// Previous reader/ender has resolved, return its result to the
 			// corresponding write() or end() call
-			this._writers.shift().resolveWrite(this._readBusy.promise);
+			this._writers.shift()!.resolveWrite(this._readBusy.promise);
 			if (this._endPending) {
 				const result = this._endPending.result;
 				this._ended = this._endPending.error || EOF;
@@ -1404,7 +1442,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		if (this._ended) {
 			while (this._writers.length > 0) {
 				// tslint:disable-next-line:no-shadowed-variable
-				const writer = this._writers.shift();
+				const writer = this._writers.shift()!;
 				writer.resolveWrite(Promise.reject(new WriteAfterEndError()));
 			}
 			return;
@@ -1459,7 +1497,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			// EOF, with or without error
 			assert(!this._ended && !this._endPending);
 			this._endPending = eof;
-			const ender = this._ender; // Ensure calling without `this`
+			const ender = this._ender!; // Ensure calling without `this`
 			this._ender = undefined; // Prevent calling again
 			// Call with end error or override with abort reason if any
 			const enderArg = this._abortPromise ? this._abortReason : eof.error;

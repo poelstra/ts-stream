@@ -19,11 +19,11 @@ import { defer, delay, settle, swallowErrors, track } from "./util";
 function readInto<T>(stream: ReadableStream<T>, into: T[]): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
 		stream.forEach(
-			(value: T) => {
+			function(this: any, value: T): void {
 				expect(this).to.equal(undefined);
 				into.push(value);
 			},
-			(err?: Error) => {
+			function(this: any, err?: Error): void {
 				expect(this).to.equal(undefined);
 				if (err) {
 					reject(err);
@@ -180,7 +180,7 @@ describe("Stream", () => {
 			swallowErrors(endDef.promise);
 			const r1 = defer();
 			const reads = [r1.promise];
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 
 			const w1 = track(s.write(1));
 			const w2 = track(s.write(2));
@@ -242,7 +242,7 @@ describe("Stream", () => {
 		it("can be called in reader", async () => {
 			swallowErrors(s.aborted());
 			swallowErrors(s.result());
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const w1 = track(s.write(1));
 			const w2 = track(s.write(2));
 			const r1 = defer();
@@ -269,7 +269,7 @@ describe("Stream", () => {
 		it("ignores multiple aborts", async () => {
 			swallowErrors(s.aborted());
 			swallowErrors(s.result());
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const w1 = track(s.write(1));
 			const r1 = defer();
 			const firstAbortError = new Error("first abort error");
@@ -291,7 +291,7 @@ describe("Stream", () => {
 			expect(we.value).to.equal(undefined);
 		});
 		it("asynchronously calls aborter when already reading", async () => {
-			let abortResult: Error = null;
+			let abortResult: Error | null | undefined = null;
 			const w1 = track(s.write(1));
 			const r1 = defer();
 			s.forEach(
@@ -315,7 +315,7 @@ describe("Stream", () => {
 		it("asynchronously calls aborter when not currently reading", async () => {
 			swallowErrors(s.aborted());
 			swallowErrors(s.result());
-			let abortResult: Error = null;
+			let abortResult: Error | null | undefined = null;
 			const abortSeen = defer();
 			const w1 = track(s.write(1));
 			s.forEach(
@@ -346,7 +346,7 @@ describe("Stream", () => {
 			await settle([w1.promise]);
 			expect(w1.reason).to.equal(abortError);
 
-			let abortResult: Error = null;
+			let abortResult: Error | null | undefined = null;
 			const abortSeen = defer();
 			swallowErrors(s.forEach(
 				(v) => undefined,
@@ -364,7 +364,7 @@ describe("Stream", () => {
 		it("no longer calls aborter when ender finished", async () => {
 			const w1 = track(s.write(1));
 			const we = track(s.end());
-			let abortResult: Error = null;
+			let abortResult: Error | null | undefined = null;
 			s.forEach(
 				(v) => undefined,
 				undefined,
@@ -417,7 +417,7 @@ describe("Stream", () => {
 
 	describe("forEach()", () => {
 		it("handles empty stream", async () => {
-			let endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
+			let endResult: Error | null | undefined = null; // null, to distinguish from 'undefined' that gets assigned by ender
 			const res = track(s.forEach(pushResult, (e?: Error) => { endResult = e; }));
 			s.end();
 			await res.promise;
@@ -427,7 +427,7 @@ describe("Stream", () => {
 		});
 
 		it("handles a single value", async () => {
-			let endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
+			let endResult: Error | null | undefined = null; // null, to distinguish from 'undefined' that gets assigned by ender
 			const res = track(s.forEach(pushResult, (e?: Error) => { endResult = e; }));
 			s.write(1);
 			s.end();
@@ -438,7 +438,7 @@ describe("Stream", () => {
 		});
 
 		it("handles multiple values", async () => {
-			let endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
+			let endResult: Error | null | undefined = null; // null, to distinguish from 'undefined' that gets assigned by ender
 			const res = track(s.forEach(pushResult, (e?: Error) => { endResult = e; }));
 			s.write(1);
 			s.write(2);
@@ -454,7 +454,7 @@ describe("Stream", () => {
 			// Error thrown in reader should ONLY reflect back to writer, not to reader
 			// Allows writer to decide to send another value, abort, end normally, etc.
 			const endError = new Error("end boom");
-			let endResult: Error = null; // null, to distinguish from 'undefined' that gets assigned by ender
+			let endResult: Error | null | undefined = null; // null, to distinguish from 'undefined' that gets assigned by ender
 			const res = track(s.forEach(
 				(n) => { throw boomError; },
 				(e?: Error) => { endResult = e; }
@@ -510,7 +510,7 @@ describe("Stream", () => {
 
 	describe("write()", () => {
 		it("disallows writing undefined", async () => {
-			const result = track(s.write(undefined));
+			const result = track(s.write(undefined as any));
 			await settle([result.promise]);
 			expect(result.reason).to.be.instanceof(TypeError);
 		});
@@ -519,7 +519,7 @@ describe("Stream", () => {
 	describe("end()", () => {
 		it("allows null as error parameter", () => {
 			readInto(s, results);
-			return s.end(null);
+			return s.end(null as any);
 		});
 		it("allows undefined as error parameter", () => {
 			readInto(s, results);
@@ -639,7 +639,7 @@ describe("Stream", () => {
 		it("can be overridden by `end()`", async () => {
 			const res = track(s.result());
 			const endResult = defer();
-			s.end(null, endResult.promise);
+			s.end(undefined, endResult.promise);
 			await delay(1);
 			expect(res.isPending).to.equal(true);
 
@@ -775,7 +775,7 @@ describe("Stream", () => {
 
 		it("calls ender and awaits its result", async () => {
 			const d = defer();
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const mapped = s.map(
 				(n) => n * 2,
 				(e) => { endResult = e; return d.promise; }
@@ -799,7 +799,7 @@ describe("Stream", () => {
 
 		it("returns asynchronous error in ender to writer but does end stream", async () => {
 			const d = defer();
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const mapped = s.map(
 				(n) => n * 2,
 				(e) => { endResult = e; return d.promise; }
@@ -830,7 +830,7 @@ describe("Stream", () => {
 		});
 
 		it("returns synchronous error in ender to writer but does end stream", async () => {
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const mapped = s.map(
 				(n) => n * 2,
 				(e) => { endResult = e; throw boomError; }
@@ -856,12 +856,12 @@ describe("Stream", () => {
 		});
 
 		it("returns synchronous error in ender to writer even if downstream ender fails", async () => {
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const mapped = s.map(
 				(n) => n * 2,
 				(e) => { endResult = e; throw boomError; }
 			);
-			let forEachEndResult: Error = null;
+			let forEachEndResult: Error | null | undefined = null;
 			mapped.forEach(
 				(n) => { results.push(n); },
 				(e) => {
@@ -890,7 +890,7 @@ describe("Stream", () => {
 
 		it("leaves original end error intact and waits for stream to end", async () => {
 			const endError = new Error("endError");
-			let mapEndResult: Error = null;
+			let mapEndResult: Error | null | undefined = null;
 			const mapped = s.map(
 				(n) => n * 2,
 				(e) => { mapEndResult = e; throw boomError; }
@@ -900,7 +900,7 @@ describe("Stream", () => {
 			const res = track(s.result());
 			swallowErrors(mapped.result());
 
-			let forEachEndResult: Error = null;
+			let forEachEndResult: Error | null | undefined = null;
 			const d = defer();
 			mapped.forEach(
 				(n) => { results.push(n); },
@@ -931,7 +931,7 @@ describe("Stream", () => {
 		});
 
 		it("supports aborter", async () => {
-			let abortResult: Error = null;
+			let abortResult: Error | null | undefined = null;
 			const abortSeen = defer();
 			const mapped = s.map(
 				(n) => n * 2,
@@ -1079,7 +1079,7 @@ describe("Stream", () => {
 
 		it("calls ender and awaits its result", async () => {
 			const d = defer();
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const filtered = s.filter(
 				(n) => true,
 				(e) => { endResult = e; return d.promise; }
@@ -1103,7 +1103,7 @@ describe("Stream", () => {
 
 		it("returns asynchronous error in ender to writer but does end stream", async () => {
 			const d = defer();
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const filtered = s.filter(
 				(n) => true,
 				(e) => { endResult = e; return d.promise; }
@@ -1134,7 +1134,7 @@ describe("Stream", () => {
 		});
 
 		it("returns synchronous error in ender to writer but does end stream", async () => {
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const filtered = s.filter(
 				(n) => true,
 				(e) => { endResult = e; throw boomError; }
@@ -1160,12 +1160,12 @@ describe("Stream", () => {
 		});
 
 		it("returns synchronous error in ender to writer even if downstream ender fails", async () => {
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const filtered = s.filter(
 				(n) => true,
 				(e) => { endResult = e; throw boomError; }
 			);
-			let forEachEndResult: Error = null;
+			let forEachEndResult: Error | null | undefined = null;
 			filtered.forEach(
 				(n) => { results.push(n); },
 				(e) => {
@@ -1194,7 +1194,7 @@ describe("Stream", () => {
 
 		it("leaves original end error intact and waits for stream to end", async () => {
 			const endError = new Error("endError");
-			let mapEndResult: Error = null;
+			let mapEndResult: Error | null | undefined = null;
 			const filtered = s.filter(
 				(n) => true,
 				(e) => { mapEndResult = e; throw boomError; }
@@ -1204,7 +1204,7 @@ describe("Stream", () => {
 			const res = track(s.result());
 			swallowErrors(filtered.result());
 
-			let forEachEndResult: Error = null;
+			let forEachEndResult: Error | null | undefined = null;
 			const d = defer();
 			filtered.forEach(
 				(n) => { results.push(n); },
@@ -1235,7 +1235,7 @@ describe("Stream", () => {
 		});
 
 		it("supports aborter", async () => {
-			let abortResult: Error = null;
+			let abortResult: Error | null | undefined = null;
 			const abortSeen = defer();
 			const filtered = s.filter(
 				(n) => true,
@@ -1296,7 +1296,7 @@ describe("Stream", () => {
 			function reducer(...args: any[]): number {
 				// Skip the last arg though (either the array or stream)
 				calls.push(args.slice(0, 3));
-				return previouses.shift();
+				return previouses.shift()!;
 			}
 
 			calls = [];
@@ -1321,7 +1321,7 @@ describe("Stream", () => {
 			function reducer(...args: any[]): number {
 				// Skip the last arg though (either the array or stream)
 				calls.push(args.slice(0, 3));
-				return previouses.shift();
+				return previouses.shift()!;
 			}
 
 			calls = [];
@@ -1346,7 +1346,7 @@ describe("Stream", () => {
 			const previouses = [-1, -2, -3];
 			function reducer(...args: any[]): number {
 				calls.push(args);
-				return previouses.shift();
+				return previouses.shift()!;
 			}
 			const value = await x.reduce(reducer);
 			expect(value).to.equal(-3);
@@ -1512,7 +1512,7 @@ describe("Stream", () => {
 			const ab = track(s.aborted());
 			const values = [1, 2, 3];
 			const writeResult = track(s.writeEach(() => values.shift()));
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const forEachResult = track(s.forEach(
 				(v) => {
 					if (v === 2) {
@@ -1591,7 +1591,7 @@ describe("Stream", () => {
 			swallowErrors(s.aborted());
 			const values = [1, 2, 3];
 			const writeResult = track(s.writeEach(() => values.shift()));
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const d = defer();
 			const forEachResult = track(s.forEach(
 				(v) => d.promise,
@@ -1647,7 +1647,7 @@ describe("Stream", () => {
 			s.forEach(noop); // flush stream
 			const writeEachResult = s.writeEach(
 				() => { throw new Error("boom"); },
-				(err) => { expect(err.message).to.equal("boom"); called = true; }
+				(err) => { expect(err && err.message).to.equal("boom"); called = true; }
 			);
 			await writeEachResult.catch(noop);
 			expect(called).to.equal(true);
@@ -1739,13 +1739,13 @@ describe("Stream", () => {
 		});
 
 		it("supports promise for array of promises", async () => {
-			const x = Stream.from(Promise.resolve([Promise.resolve(1), Promise.resolve(2)]));
+			const x = Stream.from<number>(Promise.resolve([Promise.resolve(1), Promise.resolve(2)]));
 			await x.forEach((v: number) => { results.push(v); });
 			expect(results).to.deep.equal([1, 2]);
 		});
 
 		it("ends on first undefined", async () => {
-			const x = Stream.from([1, 2, undefined, 3]);
+			const x = Stream.from<any>([1, 2, undefined, 3]);
 			await x.forEach((v) => { results.push(v); });
 			expect(x.isEnded()).to.equal(true);
 			expect(results).to.deep.equal([1, 2]);
@@ -1755,7 +1755,7 @@ describe("Stream", () => {
 			const x = Stream.from([1, 2]);
 			swallowErrors(x.result());
 			swallowErrors(x.aborted());
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const result = track(x.forEach(
 				(v) => {
 					if (v === 2) {
@@ -1792,7 +1792,7 @@ describe("Stream", () => {
 			const x = Stream.from([1, 2]);
 			swallowErrors(x.result());
 			swallowErrors(x.aborted());
-			let endResult: Error = null;
+			let endResult: Error | null | undefined = null;
 			const d = defer();
 			const result = track(x.forEach(
 				(v) => d.promise,

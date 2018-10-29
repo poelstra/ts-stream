@@ -94,7 +94,7 @@ export function defer<T>(): Deferred<T> {
 		resolve = a;
 		reject = b;
 	});
-	return { promise, reject, resolve };
+	return { promise, reject: reject!, resolve: resolve! };
 }
 
 /**

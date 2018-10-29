@@ -1,27 +1,8 @@
 {
-    "compilerOptions": {
-        "target": "es5",
-        "module": "commonjs",
-        "declaration": true,
-        "noImplicitAny": true,
-        "removeComments": false,
-        "sourceMap": true,
-        "noLib": false,
-        "preserveConstEnums": true,
-        "suppressImplicitAnyIndexErrors": true,
-        "moduleResolution": "node",
-        "outDir": "../../dist/",
-        "rootDir": "..",
-        "lib": [
-            "es2015"
-        ]
-    },
+    "extends": "../lib/tsconfig.json",
     "types": [
         "chai",
         "mocha",
         "node"
-    ],
-    "atom": {
-        "rewriteTsconfig": true
-    }
+    ]
 }

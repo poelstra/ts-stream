@@ -23,7 +23,7 @@ export function compose<In, Middle, Out>(t1: Transform<In, Middle>, t2: Transfor
 // It's refactored out, because it's currently a bit tricky and exact behavior
 // may change, see TODO in implementation.
 function composeEnders(
-	ender: (error?: Error) => void|PromiseLike<void>,
+	ender: ((error?: Error) => void|PromiseLike<void>) | undefined,
 	defaultEnder: (error?: Error) => void|PromiseLike<void>
 ): (error?: Error) => void|PromiseLike<void> {
 	if (!ender) {

@@ -1,25 +1,3 @@
 {
-    "compilerOptions": {
-        "target": "es5",
-        "module": "commonjs",
-        "declaration": true,
-        "noImplicitAny": true,
-        "removeComments": false,
-        "sourceMap": true,
-        "noLib": false,
-        "preserveConstEnums": true,
-        "suppressImplicitAnyIndexErrors": true,
-        "moduleResolution": "node",
-        "outDir": "../../dist/",
-        "rootDir": "..",
-        "lib": [
-            "es2015"
-        ]
-    },
-    "types": [
-        "node"
-    ],
-    "atom": {
-        "rewriteTsconfig": true
-    }
+    "extends": "../lib/tsconfig.json"
 }
