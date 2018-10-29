@@ -8,10 +8,10 @@
 
 /* tslint:disable:no-null-keyword */ // we use a lot of speficic null-checks below
 
-import "source-map-support/register";
 import { expect } from "chai";
+import "source-map-support/register";
 
-import { Stream, ReadableStream, WriteAfterEndError, AlreadyHaveReaderError, Transform } from "../lib/index";
+import { AlreadyHaveReaderError, ReadableStream, Stream, Transform, WriteAfterEndError } from "../lib/index";
 
 import "./mocha-init";
 import { defer, delay, settle, swallowErrors, track } from "./util";
@@ -638,7 +638,7 @@ describe("Stream", () => {
 
 		it("can be overridden by `end()`", async () => {
 			const res = track(s.result());
-			let endResult = defer();
+			const endResult = defer();
 			s.end(null, endResult.promise);
 			await delay(1);
 			expect(res.isPending).to.equal(true);

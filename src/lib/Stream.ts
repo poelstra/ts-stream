@@ -11,8 +11,8 @@
 import * as assert from "assert";
 
 import BaseError from "./BaseError";
-import { Transform, map, filter } from "./Transform";
-import { defer, Deferred, swallowErrors, track, TrackedPromise, noop } from "./util";
+import { filter, map, Transform } from "./Transform";
+import { defer, Deferred, noop, swallowErrors, track, TrackedPromise } from "./util";
 
 /**
  * Required methods for both readable and writable parts of a stream.
@@ -462,7 +462,7 @@ export interface WritableStream<T> extends Writable<T>, CommonStream<T> {
 	writeEach(
 		writer: () => T|undefined|void|PromiseLike<T|undefined|void>,
 		ender?: (abortReason?: Error) => void|PromiseLike<void>,
-		aborter?: (abortReason: Error) => void,
+		aborter?: (abortReason: Error) => void
 	): Promise<void>;
 
 	// TODO Experimental
@@ -641,7 +641,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			);
 		}
 
-		let writeDone = defer();
+		const writeDone = defer();
 		this._writers.push({
 			resolveWrite: writeDone.resolve,
 			value: track<T>(Promise.resolve(value)),
@@ -687,11 +687,11 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			endedResult = Promise.reject(error);
 			swallowErrors(endedResult);
 		}
-		let eof = new Eof(error, endedResult);
+		const eof = new Eof(error, endedResult);
 		if (!this._ending && !this._ended) {
 			this._ending = eof;
 		}
-		let writeDone = defer();
+		const writeDone = defer();
 		const item: WriteItem<T> = {
 			resolveWrite: writeDone.resolve,
 			value: eof,
@@ -908,7 +908,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		ender?: (error?: Error) => void|PromiseLike<void>,
 		aborter?: (error: Error) => void
 	): ReadableStream<R> {
-		let output = new Stream<R>();
+		const output = new Stream<R>();
 		map(this, output, mapper, ender, aborter);
 		return output;
 	}
@@ -938,7 +938,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		ender?: (error?: Error) => void|PromiseLike<void>,
 		aborter?: (error: Error) => void
 	): ReadableStream<T> {
-		let output = new Stream<T>();
+		const output = new Stream<T>();
 		filter(this, output, filterer, ender, aborter);
 		return output;
 	}
@@ -1082,7 +1082,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @return Promise for an array of all stream values
 	 */
 	public toArray(): Promise<T[]> {
-		let result: T[] = [];
+		const result: T[] = [];
 		return this.forEach((value: T) => { result.push(value); })
 			.then(() => result);
 	}
@@ -1113,7 +1113,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @return Readable stream with the transformed results
 	 */
 	public transform<R>(transformer: Transform<T, R>): ReadableStream<R> {
-		let output = new Stream<R>();
+		const output = new Stream<R>();
 		transformer(this, output);
 		return output;
 	}
@@ -1175,7 +1175,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	public writeEach(
 		writer: () => T|undefined|void|PromiseLike<T|undefined|void>,
 		ender?: (abortReason?: Error) => void|PromiseLike<void>,
-		aborter?: (abortReason: Error) => void,
+		aborter?: (abortReason: Error) => void
 	): Promise<void> {
 		/**
 		 * Call aborter (if any) and convert any thrown error into
@@ -1247,7 +1247,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	// TODO Experimental
 	// TODO Not sure whether a 'reverse' function confuses more than it helps
 	public mappedBy<X>(mapper: (value: X) => T|PromiseLike<T>): WritableStream<X> {
-		let input = new Stream<X>();
+		const input = new Stream<X>();
 		map(input, this, mapper);
 		return input;
 	}
@@ -1255,7 +1255,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	// TODO Experimental
 	// TODO Not sure whether a 'reverse' function confuses more than it helps
 	public filterBy(filterer: (value: T) => boolean|PromiseLike<boolean>): WritableStream<T> {
-		let input = new Stream<T>();
+		const input = new Stream<T>();
 		filter(input, this, filterer);
 		return input;
 	}
@@ -1289,7 +1289,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param data (Promise for) input array of (promises for) values
 	 * @return Stream of all values in the input array
 	 */
-	public static from<T>(data: PromiseLike<T>[]): ReadableStream<T>;
+	public static from<T>(data: PromiseLike<T>[]): ReadableStream<T>; // tslint:disable-line:unified-signatures
 	/**
 	 * Return a Stream for all values in the input array.
 	 *
@@ -1304,7 +1304,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param data (Promise for) input array of (promises for) values
 	 * @return Stream of all values in the input array
 	 */
-	public static from<T>(data: PromiseLike<T[]>): ReadableStream<T>;
+	public static from<T>(data: PromiseLike<T[]>): ReadableStream<T>; // tslint:disable-line:unified-signatures
 	/**
 	 * Return a Stream for all values in the input array.
 	 *
@@ -1319,7 +1319,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @param data (Promise for) input array of (promises for) values
 	 * @return Stream of all values in the input array
 	 */
-	public static from<T>(data: T[]): ReadableStream<T>;
+	public static from<T>(data: T[]): ReadableStream<T>; // tslint:disable-line:unified-signatures
 	/**
 	 * Return a Stream for all values in the input array.
 	 *
@@ -1335,7 +1335,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * @return Stream of all values in the input array
 	 */
 	public static from<T>(data: T[]|PromiseLike<T[]>|PromiseLike<T>[]|PromiseLike<PromiseLike<T>[]>): ReadableStream<T> {
-		let stream = new Stream<T>();
+		const stream = new Stream<T>();
 		let i = 0;
 		if (Array.isArray(data)) {
 			stream.writeEach(() => data[i++]);
@@ -1377,7 +1377,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			// corresponding write() or end() call
 			this._writers.shift().resolveWrite(this._readBusy.promise);
 			if (this._endPending) {
-				let result = this._endPending.result;
+				const result = this._endPending.result;
 				this._ended = this._endPending.error || EOF;
 				this._ending = undefined;
 				this._endPending = undefined;
@@ -1403,7 +1403,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		// If ended, reject any pending and future writes/ends with an error
 		if (this._ended) {
 			while (this._writers.length > 0) {
-				let writer = this._writers.shift();
+				// tslint:disable-next-line:no-shadowed-variable
+				const writer = this._writers.shift();
 				writer.resolveWrite(Promise.reject(new WriteAfterEndError()));
 			}
 			return;
@@ -1413,7 +1414,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		// not the end()'s)
 		if (this._abortPromise) {
 			while (this._writers.length > 0) {
-				let writer = this._writers[0];
+				// tslint:disable-next-line:no-shadowed-variable
+				const writer = this._writers[0];
 				if (writer.value instanceof Eof) {
 					break;
 				}
@@ -1430,7 +1432,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			// write(), end() and forEach() will pump us again
 			return;
 		}
-		let writer = this._writers[0];
+		const writer = this._writers[0];
 
 		// Wait until next written value is available
 		// (Note: when aborting, all non-end() writers will already have been
@@ -1457,10 +1459,10 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 			// EOF, with or without error
 			assert(!this._ended && !this._endPending);
 			this._endPending = eof;
-			let ender = this._ender; // Ensure calling without `this`
+			const ender = this._ender; // Ensure calling without `this`
 			this._ender = undefined; // Prevent calling again
 			// Call with end error or override with abort reason if any
-			let enderArg = this._abortPromise ? this._abortReason : eof.error;
+			const enderArg = this._abortPromise ? this._abortReason : eof.error;
 			this._readBusy = track(Promise.resolve(eof).then((eofValue) => ender(enderArg)));
 		} else {
 			this._readBusy = track(writer.value.promise.then(this._reader));

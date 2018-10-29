@@ -6,7 +6,7 @@
  * License: MIT
  */
 
-import {defer} from "../lib/util";
+import { defer } from "../lib/util";
 export * from "../lib/util";
 
 /**

@@ -132,8 +132,9 @@ export interface TrackedVoidPromise extends TrackedPromise<void> {
 }
 
 /**
- * Allows to track the status of a promise. Note that this attaches a handler to the promise so no unhandled rejection can take place after
- * this (after all you're tracking the error)
+ * Allows to track the status of a promise. Note that this attaches a handler
+ * to the promise so no unhandled rejection can take place after this (after
+ * all you're tracking the error)
  *
  * @param p promise to track
  */
@@ -164,7 +165,6 @@ export function track<T>(p: PromiseLike<T>): TrackedPromise<T> {
 	};
 	return tracked;
 }
-
 
 /**
  * Resolves a promise after a number of milliseconds

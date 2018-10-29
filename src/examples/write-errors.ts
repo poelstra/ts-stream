@@ -5,16 +5,17 @@
  * Copyright (C) 2015 Martin Poelstra
  * License: MIT
  */
+// tslint:disable:no-console
 
 import Stream from "../lib/index";
 
-var source = new Stream<number>();
+const source = new Stream<number>();
 source.write(0).then(() => console.log("write 0 ok"), (err) => console.log("write 0 error", err));
 source.write(1).then(() => console.log("write 1 ok"), (err) => console.log("write 1 error", err));
 source.write(2).then(() => console.log("write 2 ok"), (err) => console.log("write 2 error", err));
 source.end(new Error("oops")).then(() => console.log("write end ok"), (err) => console.log("write end error", err));
 
-var mapped = source.map((n) => {
+const mapped = source.map((n) => {
 	return n * 2;
 });
 

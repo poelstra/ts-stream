@@ -5,13 +5,14 @@
  * Copyright (C) 2015 Martin Poelstra
  * License: MIT
  */
+// tslint:disable:no-console
 
 import Stream from "../lib/index";
-import {delay} from "../lib/util";
+import { delay } from "../lib/util";
 
 // Create a source that produces numbers 0, 1, 2, 3
-var i = 0;
-var source = new Stream<number>();
+let i = 0;
+const source = new Stream<number>();
 source.writeEach(() => {
 	if (i === 4) {
 		console.log("writing end");

@@ -6,10 +6,10 @@
  * License: MIT
  */
 
-import * as NodeStream from "stream";
 import * as fs from "fs";
+import * as NodeStream from "stream";
 
-import { Stream, Readable } from "./Stream";
+import { Readable, Stream } from "./Stream";
 import { defer, swallowErrors, VoidDeferred } from "./util";
 
 /**
@@ -45,7 +45,7 @@ export class NodeReadable<T> extends NodeStream.Readable {
 					return;
 				}
 				// Stream blocked, wait until _read() is called
-				let d = defer();
+				const d = defer();
 				this._resumer = d.resolve;
 				return d.promise;
 			},
@@ -137,7 +137,7 @@ export function pipeToNodeStream<T>(
 	nodeWritable: NodeJS.WritableStream,
 	emitError: boolean = false
 ): Promise<void> {
-	let endDeferred = defer();
+	const endDeferred = defer();
 	let blockedDeferred: VoidDeferred;
 
 	// Handle errors emitted by node stream: abort ts-stream
@@ -174,7 +174,7 @@ export function pipeToNodeStream<T>(
 		(chunk: any): void|Promise<void> => {
 			blockedDeferred = undefined;
 			// Try to push data, returns true if there's still space
-			let canAcceptMore = nodeWritable.write(chunk);
+			const canAcceptMore = nodeWritable.write(chunk);
 			if (!canAcceptMore) {
 				// Stream blocked, wait until drain is emitted
 				blockedDeferred = defer();

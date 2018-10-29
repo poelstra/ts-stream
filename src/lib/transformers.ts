@@ -7,7 +7,7 @@
  */
 
 import { Readable, Writable } from "./Stream";
-import { Transform, filter, map } from "./Transform";
+import { filter, map, Transform } from "./Transform";
 
 export function mapper<In, Out>(mapFn: (value: In) => Out|PromiseLike<Out>): Transform<In, Out> {
 	return (readable: Readable<In>, writable: Writable<Out>): void => {

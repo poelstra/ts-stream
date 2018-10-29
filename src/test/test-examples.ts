@@ -5,11 +5,11 @@
  * License: MIT
  */
 
-import "source-map-support/register";
 import { expect } from "chai";
+import "source-map-support/register";
 
-import { Stream, ReadableStream, WritableStream, Readable, Writable, Transform } from "../lib/index";
-import { delay, settle, noop } from "./util";
+import { Readable, ReadableStream, Stream, Transform, Writable, WritableStream } from "../lib/index";
+import { delay, noop, settle } from "./util";
 
 enum MockDatabaseState {
 	Opening,
@@ -24,11 +24,11 @@ enum MockDatabaseState {
  * Mock object to simulate a stateful resource that needs
  * proper opening and closing, and which can be only opened
  * by one 'user'.
- * 
+ *
  * It allows only one operation to be in-progress at any point
  * in time (e.g. reading, closing), and the database needs to
  * be 'open' for all operations (except open itself, of course).
- * 
+ *
  * All operations take some time, to allow any internal promises
  * in the library to settle.
  */
@@ -115,13 +115,13 @@ async function idiomaticSource<T>(db: MockDatabase<T>, destination: WritableStre
 	await destination.writeEach(
 		() => db.read(),
 		() => db.close(),
-		(err) => db.abort(),
+		(err) => db.abort()
 	);
 }
 
 /**
  * Simplest way of creating a sink, using .forEach().
- * 
+ *
  * It correctly handles backpressure, aborting, and cleaning up
  * the underlying resource.
  * This ensures that other elements in the stream also wait until
@@ -134,7 +134,7 @@ async function idiomaticSink<T>(source: ReadableStream<T>, db: MockDatabase<T>):
 	await source.forEach(
 		(value) => db.write(value),
 		(endError) => db.close(), // optionally do something with endError, e.g. rollback transaction
-		(abortError) => db.abort(),
+		(abortError) => db.abort()
 	);
 }
 
@@ -187,7 +187,7 @@ async function idiomaticManualSource<T>(db: MockDatabase<T>, destination: Stream
 function createTransform<T, R>(transformer: (value: T) => R | PromiseLike<R>): Transform<T, R> {
 	return function idiomaticTransform(
 		readable: Readable<T>,
-		writable: Writable<R>,
+		writable: Writable<R>
 	): void {
 		// 1. Ensure aborts bubble from upstream to downstream
 		writable.aborted().catch((err) => readable.abort(err));
@@ -210,7 +210,7 @@ function createTransform<T, R>(transformer: (value: T) => R | PromiseLike<R>): T
 				// has ended, and must never throw an error.
 			}
 		);
-	}
+	};
 }
 
 describe("idiomatic examples", () => {

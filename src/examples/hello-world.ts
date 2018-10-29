@@ -5,6 +5,7 @@
  * Copyright (C) 2015 Martin Poelstra
  * License: MIT
  */
+// tslint:disable:no-console
 
 import Stream from "../lib/index";
 

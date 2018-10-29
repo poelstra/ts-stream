@@ -5,9 +5,10 @@
  * Copyright (C) 2015 Martin Poelstra
  * License: MIT
  */
+// tslint:disable:no-console
 
 import Stream from "../lib/index";
-import {delay} from "../lib/util";
+import { delay } from "../lib/util";
 
 Stream.from([1, 2, 3, 4])
 	.map(async (n) => {

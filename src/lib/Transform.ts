@@ -6,15 +6,13 @@
  * License: MIT
  */
 
-import { Stream, Readable, Writable } from "./Stream";
+import { Readable, Stream, Writable } from "./Stream";
 
-export interface Transform<In, Out> {
-	(readable: Readable<In>, writable: Writable<Out>): void;
-}
+export type Transform<In, Out> = (readable: Readable<In>, writable: Writable<Out>) => void;
 
 export function compose<In, Middle, Out>(t1: Transform<In, Middle>, t2: Transform<Middle, Out>): Transform<In, Out> {
 	return (readable: Readable<In>, writable: Writable<Out>): void => {
-		let stream = new Stream<Middle>();
+		const stream = new Stream<Middle>();
 		t1(readable, stream);
 		t2(stream, writable);
 	};
@@ -80,7 +78,7 @@ export function filter<T>(
 	readable.aborted().catch((err) => writable.abort(err));
 	readable.forEach(
 		(v: T): void|Promise<void> => {
-			var b = filterer(v);
+			const b = filterer(v);
 			if (!b) {
 				return;
 			} else if (b === true) { // note: not just `if (b)`!

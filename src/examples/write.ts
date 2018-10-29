@@ -5,12 +5,13 @@
  * Copyright (C) 2015 Martin Poelstra
  * License: MIT
  */
+// tslint:disable:no-console
 
 import Stream from "../lib/index";
 
-var source = new Stream<number>();
-var p = Promise.resolve();
-var i = 0;
+const source = new Stream<number>();
+let p = Promise.resolve();
+let i = 0;
 p = p.then(() => { console.log("write", i); return source.write(i++); });
 p = p.then(() => { console.log("write", i); return source.write(i++); });
 p = p.then(() => { console.log("write", i); return source.write(i++); });

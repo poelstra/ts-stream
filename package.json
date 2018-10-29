@@ -41,7 +41,7 @@
     "istanbul": "^0.4.5",
     "mocha": "^3.1.0",
     "source-map-support": "^0.4.3",
-    "tslint": "^3.15.1",
+    "tslint": "^5.11.0",
     "typescript": "~3.0.3"
   }
 }
