@@ -373,6 +373,15 @@ in your program.
 List of most notable changes for each release. For details, just see the commits
 between each version tag on GitHub.
 
+2.0.0 (2018-10-29):
+- No longer make `.forEach()` and friends bounce end error back by default (#35, thanks @martinheidegger)
+  - Note: it's still returned from `.result()`, and thus the result of `.forEach()` itself
+- `.writeEach()` now supports `ender` and `aborter` callbacks, similar to `.forEach()`
+- Allow calling `.abort()` without explicit abort reason
+- Add idiomatic example sources/sinks/transformations in `test-idiomatic.ts`
+- Increased test coverage
+- Update TypeScript to 3.1.3, compile in strict mode
+
 1.0.1 (2017-12-06):
 - Fix unhandled rejection error when error bounces back from ender in certain cases (#31, thanks @rogierschouten)
   - Also fixes downstream streams not waiting for upstream streams in case downstream ender was rejected
