@@ -373,6 +373,10 @@ in your program.
 List of most notable changes for each release. For details, just see the commits
 between each version tag on GitHub.
 
+2.0.1 (2019-07-21):
+- Update devDependencies to fix security warnings
+- Move remap-istanbul to devDependencies
+
 2.0.0 (2018-10-29):
 - No longer make `.forEach()` and friends bounce end error back by default (#35, thanks @martinheidegger)
   - Note: it's still returned from `.result()`, and thus the result of `.forEach()` itself
