@@ -7,7 +7,7 @@
     "test": "npm run lint && npm run build && mocha dist/test/test-*.js",
     "cover": "npm run -s build && istanbul cover --report json _mocha -- -R spec dist/test/test-*.js && remap-istanbul -i coverage/coverage-final.json -t html -o coverage/html-report",
     "prepare": "npm test",
-    "prepublishOnly": "npm run test",
+    "prepublishOnly": "npm run -s prepare",
     "build": "tsc -p src/lib/ && tsc -p src/test/ && tsc -p src/examples",
     "lint": "tslint -t verbose src/**/*.ts",
     "preversion": "npm install",
