@@ -9,5 +9,6 @@
 /.gitattributes
 /.gitignore
 /.npmignore
+/.nyc_output/
 /.travis.yml
 /.vscode
