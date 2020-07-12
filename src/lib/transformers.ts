@@ -7,7 +7,7 @@
  */
 
 import { Readable, Writable } from "./Stream";
-import { filter, map, Transform } from "./Transform";
+import { filter, map, Transform, batch } from "./Transform";
 
 export function mapper<In, Out>(
 	mapFn: (value: In) => Out | PromiseLike<Out>
@@ -22,5 +22,11 @@ export function filterer<T>(
 ): Transform<T, T> {
 	return (readable: Readable<T>, writable: Writable<T>): void => {
 		filter(readable, writable, filterFn);
+	};
+}
+
+export function batcher<In>(chunkSize: number): Transform<In, In[]> {
+	return (readable: Readable<In>, writable: Writable<In[]>): void => {
+		batch(readable, writable, chunkSize);
 	};
 }

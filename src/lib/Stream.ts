@@ -11,7 +11,7 @@
 import * as assert from "assert";
 
 import BaseError from "./BaseError";
-import { filter, map, Transform } from "./Transform";
+import { batch, filter, map, Transform } from "./Transform";
 import {
 	defer,
 	Deferred,
@@ -308,6 +308,16 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 		ender?: (error?: Error) => void | PromiseLike<void>,
 		aborter?: (error: Error) => void
 	): ReadableStream<T>;
+
+	/**
+	 * Transform a stream into a readable stream that emits arrays of elements.
+	 *
+	 * The length of the arrays is limited by `batchSize`.
+	 *
+	 * @param batchSize The maximum length of batch for the readable stream to emit.
+	 * @return New readable stream emitting input values in batches.
+	 */
+	batch(batchSize: number): ReadableStream<T[]>;
 
 	/**
 	 * Reduce the stream into a single value by calling a reducer callback for
@@ -1014,6 +1024,20 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	): ReadableStream<T> {
 		const output = new Stream<T>();
 		filter(this, output, filterer, ender, aborter);
+		return output;
+	}
+
+	/**
+	 * Transform a stream into a readable stream that emits arrays of elements.
+	 *
+	 * The length of the arrays is limited by `batchSize`.
+	 *
+	 * @param batchSize The maximum length of batch for the readable stream to emit.
+	 * @return New readable stream emitting input values in batches.
+	 */
+	public batch(batchSize: number): ReadableStream<T[]> {
+		const output = new Stream<T[]>();
+		batch(this, output, batchSize);
 		return output;
 	}
 

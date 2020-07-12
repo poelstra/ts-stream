@@ -112,4 +112,30 @@ export function filter<T>(
 	);
 }
 
+export function batch<T>(
+	readable: Readable<T>,
+	writable: Writable<T[]>,
+	batchSize: number
+): void {
+	writable.aborted().catch((err) => readable.abort(err));
+	readable.aborted().catch((err) => writable.abort(err));
+	
+	let chunk: T[] = [];
+	
+	readable.forEach(
+		(v: T): void|Promise<void> => {
+			chunk.push(v);
+
+			if (chunk.length >= batchSize) {
+				writable.write(chunk);
+				chunk = [];
+			}
+		},
+		composeEnders(
+			() => chunk.length ? writable.write(chunk) : undefined,
+			(error?: Error) => writable.end(error, readable.result())
+		)
+	);
+}
+
 export default Transform;
