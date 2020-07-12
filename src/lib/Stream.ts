@@ -32,28 +32,33 @@ export interface Common<T> {
 	result(): Promise<void>;
 
 	/**
-	 * Signal stream abort.
+	 * Signal that the stream is aborted: it will no longer read incoming
+	 * elements and will no longer write elements except in the course of
+	 * processing any pending asynchronous reader callbacks (i.e. unresolved
+	 * Promises returned by `forEach()` or other stream iterators). Does not
+	 * end the stream.
 	 *
-	 * If an `aborter` callback is set by `forEach()` and the stream has not
-	 * ended yet, it will (asynchronously) be called with the abort reason, to
-	 * allow early termination of pending operation(s).
+	 * An upstream source can handle this `abort()` by catching the exception
+	 * from its own `aborted()` method--for example, to cancel pending fetch
+	 * operations, or close a continuous data stream.
 	 *
-	 * If a reader is currently processing a value (i.e. a promise returned from
-	 * a read callback is not resolved yet), that operation is still allowed to
-	 * complete (although it can e.g. be cancelled by the `aborter` callback
-	 * to `forEach()`).
+	 * If the stream's `forEach()` function provided an `aborter` callback and
+	 * the stream is not yet ended, `aborter` will be called with the abort reason.
+	 * This can be used to cancel any remaining operations inside the asynchronous
+	 * reader callback.
 	 *
-	 * Any pending and future `write()`s after that will be rejected with the
-	 * given error.
+	 * Once the last pending callback is resolved, any pending and future `write()`s
+	 * to this stream will be rejected with the error provided to `abort()`.
 	 *
-	 * It is still necessary to explicitly `end()` the stream, after which the
-	 * stream's `ender` callback is called with the abort error (i.e. any error
-	 * passed to `end()` is ignored). This ensures any resources can be cleaned
-	 * up correctly (both on reader and writer side).
+	 * It is still necessary to explicitly `end()` the stream, to ensure that any
+	 * resources can be cleaned up correctly both on the reader and writer side.
+	 * The stream's `ender` callback will be called with the abort error (i.e. any
+	 * error passed to `end()` is ignored.)
 	 *
 	 * The abort is ignored if the stream is already aborted.
-	 * Note that it's possible to abort an ended stream, to allow the abort to
-	 * 'bubble' to other parts in a chain of streams, which may not have ended
+	 *
+	 * It's possible to abort an ended stream. This can be used to 'bubble' an
+	 * abort signal to other parts in a chain of streams which may not have ended
 	 * yet. It will not change the end-state of this part of the stream though.
 	 *
 	 * @param reason Optional Error value to signal a reason for the abort
@@ -819,28 +824,33 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	}
 
 	/**
-	 * Signal stream abort.
+	 * Signal that the stream is aborted: it will no longer read incoming
+	 * elements and will no longer write elements except in the course of
+	 * processing any pending asynchronous reader callbacks (i.e. unresolved
+	 * Promises returned by `forEach()` or other stream iterators). Does not
+	 * end the stream.
 	 *
-	 * If an `aborter` callback is set by `forEach()` and the stream has not
-	 * ended yet, it will (asynchronously) be called with the abort reason, to
-	 * allow early termination of pending operation(s).
+	 * An upstream source can handle this `abort()` by catching the exception
+	 * from its own `aborted()` method--for example, to cancel pending fetch
+	 * operations, or close a continuous data stream.
 	 *
-	 * If a reader is currently processing a value (i.e. a promise returned from
-	 * a read callback is not resolved yet), that operation is still allowed to
-	 * complete (although it can e.g. be cancelled by the `aborter` callback
-	 * to `forEach()`).
+	 * If the stream's `forEach()` function provided an `aborter` callback and
+	 * the stream is not yet ended, `aborter` will be called with the abort reason.
+	 * This can be used to cancel any remaining operations inside the asynchronous
+	 * reader callback.
 	 *
-	 * Any pending and future `write()`s after that will be rejected with the
-	 * given error.
+	 * Once the last pending callback is resolved, any pending and future `write()`s
+	 * to this stream will be rejected with the error provided to `abort()`.
 	 *
-	 * It is still necessary to explicitly `end()` the stream, after which the
-	 * stream's `ender` callback is called with the abort error (i.e. any error
-	 * passed to `end()` is ignored). This ensures any resources can be cleaned
-	 * up correctly (both on reader and writer side).
+	 * It is still necessary to explicitly `end()` the stream, to ensure that any
+	 * resources can be cleaned up correctly both on the reader and writer side.
+	 * The stream's `ender` callback will be called with the abort error (i.e. any
+	 * error passed to `end()` is ignored.)
 	 *
 	 * The abort is ignored if the stream is already aborted.
-	 * Note that it's possible to abort an ended stream, to allow the abort to
-	 * 'bubble' to other parts in a chain of streams, which may not have ended
+	 *
+	 * It's possible to abort an ended stream. This can be used to 'bubble' an
+	 * abort signal to other parts in a chain of streams which may not have ended
 	 * yet. It will not change the end-state of this part of the stream though.
 	 *
 	 * @param reason Optional Error value to signal a reason for the abort
