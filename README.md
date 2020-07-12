@@ -421,13 +421,15 @@ the TODO...
 # Status
 
 The package has been battle-tested in production in a large (closed-source,
-unfortunately) project for many years now.
+unfortunately) project for many years now. Although it does not receive updates
+very regularly anymore, that's not because it's deserted, it's just considered
+pretty stable.
 
 However, there's always room for improvement, see open issues for ideas.
-A number of small TODO's in the code need some love.
+A small number of minor TODO's in the code may need some love.
 A number of methods are still marked as experimental (and basically undocumented
-nor unit-tested). They should be considered obsolete, and will be removed in a
-future version.
+nor unit-tested). They should be considered obsolete, and will probably be
+removed in a future version.
 
 # TODO
 
@@ -451,6 +453,8 @@ This will automatically install all (development-)dependencies, compile and run
 unit tests.
 
 Run `npm test` to recompile and run the tests again.
+If you don't have Prettier enabled in your IDE, you'll need to run `npm format`
+before the linting will pass.
 
 If you want to debug the Typescript code, it may be helpful to use the
 sourcemaps provided during compile. Just `import "source-map-support/register";`
