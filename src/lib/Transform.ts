@@ -132,9 +132,22 @@ export function batch<T>(
 			}
 		},
 		composeEnders(
-			() => chunk.length ? writable.write(chunk) : undefined,
+			() => {
+				if (chunk.length) {
+					return writable.write(chunk);
+				} else {
+					return undefined;
+				}
+			},
 			(error?: Error) => writable.end(error, readable.result())
-		)
+		),
+		() => {
+			if (chunk.length) {
+				return writable.write(chunk);
+			} else {
+				return undefined;
+			}
+		}
 	);
 }
 
