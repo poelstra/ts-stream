@@ -123,44 +123,46 @@ export function batch<T>(
 	writable.aborted().catch((err) => readable.abort(err));
 	readable.aborted().catch((err) => writable.abort(err));
 
-	let batch: T[] = [];
+	let queue: T[] = [];
 	let writeBatchPromise: Promise<void> | undefined;
 	let timer: NodeJS.Timer | undefined;
 
 	async function flush() {
-		if (batch.length) {
-			writeBatchPromise = writable.write(batch).then(
+		if (queue.length) {
+			writeBatchPromise = writable.write(queue).then(
 				() => writeBatchPromise = undefined
-			)
-			batch = [];
+			);
+			queue = [];
 			return writeBatchPromise;
 		}
 	}
 
 	function cleanup() {
-		timer && clearTimeout(timer);
+		if (timer) {
+			clearTimeout(timer);
+		}
 		return flush();
 	}
 
 	readable.forEach(
 		(v: T): void|Promise<void> => {
-			batch.push(v);
+			queue.push(v);
 
-			if (batch.length >= maxBatchSize) {
-				flush()
-			} else if (batch.length >= minBatchSize) {
+			if (queue.length >= maxBatchSize) {
+				flush();
+			} else if (queue.length >= minBatchSize) {
 				if (writeBatchPromise) {
-					writeBatchPromise.then(flush)
+					writeBatchPromise.then(flush);
 				} else {
-					flush()
+					flush();
 				}
 			}
 
-			if (batch.length && flushTimeout !== undefined) {
+			if (queue.length && flushTimeout !== undefined) {
 				timer = setTimeout(
 					flush,
 					flushTimeout
-				)
+				);
 			}
 		},
 		composeEnders(
