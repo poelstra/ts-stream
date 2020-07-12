@@ -7,6 +7,7 @@
  */
 
 import { Readable, Stream, Writable } from "./Stream";
+import { track, TrackedVoidPromise } from "./util";
 
 export type Transform<In, Out> = (
 	readable: Readable<In>,
@@ -115,39 +116,58 @@ export function filter<T>(
 export function batch<T>(
 	readable: Readable<T>,
 	writable: Writable<T[]>,
-	batchSize: number
+	maxBatchSize: number,
+	minBatchSize = maxBatchSize,
+	flushTimeout: number | undefined
 ): void {
 	writable.aborted().catch((err) => readable.abort(err));
 	readable.aborted().catch((err) => writable.abort(err));
-	
-	let chunk: T[] = [];
-	
+
+	let batch: T[] = [];
+	let writeBatchPromise: Promise<void> | undefined;
+	let timer: NodeJS.Timer | undefined;
+
+	async function flush() {
+		if (batch.length) {
+			writeBatchPromise = writable.write(batch).then(
+				() => writeBatchPromise = undefined
+			)
+			batch = [];
+			return writeBatchPromise;
+		}
+	}
+
+	function cleanup() {
+		timer && clearTimeout(timer);
+		return flush();
+	}
+
 	readable.forEach(
 		(v: T): void|Promise<void> => {
-			chunk.push(v);
+			batch.push(v);
 
-			if (chunk.length >= batchSize) {
-				writable.write(chunk);
-				chunk = [];
+			if (batch.length >= maxBatchSize) {
+				flush()
+			} else if (batch.length >= minBatchSize) {
+				if (writeBatchPromise) {
+					writeBatchPromise.then(flush)
+				} else {
+					flush()
+				}
+			}
+
+			if (batch.length && flushTimeout !== undefined) {
+				timer = setTimeout(
+					flush,
+					flushTimeout
+				)
 			}
 		},
 		composeEnders(
-			() => {
-				if (chunk.length) {
-					return writable.write(chunk);
-				} else {
-					return undefined;
-				}
-			},
+			cleanup,
 			(error?: Error) => writable.end(error, readable.result())
 		),
-		() => {
-			if (chunk.length) {
-				return writable.write(chunk);
-			} else {
-				return undefined;
-			}
-		}
+		cleanup
 	);
 }
 
