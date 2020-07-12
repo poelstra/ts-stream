@@ -1,48 +1,48 @@
 {
-  "name": "ts-stream",
-  "version": "2.0.1",
-  "description": "Type-safe object streams with seamless support for backpressure, ending, and error handling",
-  "main": "./dist/lib/index.js",
-  "scripts": {
-    "test": "npm run lint && npm run build && mocha dist/test/test-*.js",
-    "cover": "npm run -s build && istanbul cover --report json _mocha -- -R spec dist/test/test-*.js && remap-istanbul -i coverage/coverage-final.json -t html -o coverage/html-report",
-    "prepare": "npm test",
-    "prepublishOnly": "npm run -s prepare",
-    "build": "tsc -p src/lib/ && tsc -p src/test/ && tsc -p src/examples",
-    "lint": "tslint -t verbose src/**/*.ts",
-    "preversion": "npm install",
-    "version": "git add package-lock.json"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/poelstra/ts-stream.git"
-  },
-  "keywords": [
-    "stream",
-    "promise",
-    "backpressure",
-    "transform"
-  ],
-  "author": "Martin Poelstra <martin@beryllium.net>",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/poelstra/ts-stream/issues"
-  },
-  "homepage": "https://github.com/poelstra/ts-stream#readme",
-  "dependencies": {
-    "@types/node": "*"
-  },
-  "typings": "./dist/lib/index.d.ts",
-  "devDependencies": {
-    "@types/chai": "^3.4.34",
-    "@types/mocha": "^2.2.32",
-    "chai": "^3.5.0",
-    "coveralls": "^3.0.2",
-    "istanbul": "^0.4.5",
-    "mocha": "^5.2.0",
-    "remap-istanbul": "^0.12.0",
-    "source-map-support": "^0.5.9",
-    "tslint": "^5.11.0",
-    "typescript": "^3.1.3"
-  }
+	"name": "ts-stream",
+	"version": "2.0.1",
+	"description": "Type-safe object streams with seamless support for backpressure, ending, and error handling",
+	"main": "./dist/lib/index.js",
+	"scripts": {
+		"test": "npm run -s lint && npm run -s build && npm run -s mocha",
+		"mocha": "mocha",
+		"cover": "npm run -s build && nyc npm -s run mocha",
+		"lint": "tslint -t verbose src/**/*.ts",
+		"prepare": "npm run -s test",
+		"prepublishOnly": "npm run -s prepare",
+		"build": "tsc -p src/lib/ && tsc -p src/test/ && tsc -p src/examples",
+		"preversion": "npm install",
+		"version": "git add package-lock.json"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/poelstra/ts-stream.git"
+	},
+	"keywords": [
+		"stream",
+		"promise",
+		"backpressure",
+		"transform"
+	],
+	"author": "Martin Poelstra <martin@beryllium.net>",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/poelstra/ts-stream/issues"
+	},
+	"homepage": "https://github.com/poelstra/ts-stream#readme",
+	"dependencies": {
+		"@types/node": "*"
+	},
+	"typings": "./dist/lib/index.d.ts",
+	"devDependencies": {
+		"@types/chai": "^4.2.11",
+		"@types/mocha": "^8.0.0",
+		"chai": "^4.2.0",
+		"coveralls": "^3.1.0",
+		"mocha": "^8.0.1",
+		"nyc": "^15.1.0",
+		"source-map-support": "^0.5.19",
+		"tslint": "^5.11.0",
+		"typescript": "^3.1.3"
+	}
 }

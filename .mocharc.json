@@ -1,0 +1,4 @@
+{
+	"spec": "dist/test/**/*.js",
+	"require": "source-map-support/register"
+}

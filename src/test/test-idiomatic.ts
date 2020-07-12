@@ -6,7 +6,6 @@
  */
 
 import { expect } from "chai";
-import "source-map-support/register";
 
 import { Readable, ReadableStream, Stream, Transform, Writable, WritableStream } from "../lib/index";
 import { delay, noop, settle } from "./util";

@@ -9,7 +9,6 @@
 /* tslint:disable:no-null-keyword */ // we use a lot of speficic null-checks below
 
 import { expect } from "chai";
-import "source-map-support/register";
 
 import { AlreadyHaveReaderError, ReadableStream, Stream, Transform, WriteAfterEndError } from "../lib/index";
 
@@ -1809,7 +1808,7 @@ describe("Stream", () => {
 	}); // from()
 
 	describe("issue #31", (): void => {
-		it("should not result in unhandled rejections", (done: MochaDone): void => {
+		it("should not result in unhandled rejections", (done) => {
 			const result = new Stream();
 			const stream = new Stream();
 			stream.end(new Error("foo"))
@@ -1820,7 +1819,7 @@ describe("Stream", () => {
 			setTimeout(done, 10);
 		});
 
-		it("should wait for source stream before passing on result", (done: MochaDone) => {
+		it("should wait for source stream before passing on result", (done) => {
 			const result = new Stream();
 			const stream = new Stream();
 			const d = defer();

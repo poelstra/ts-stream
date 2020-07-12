@@ -95,11 +95,21 @@ export class FileSink extends Stream<string> {
 	 * @param  path    Filename to wite to
 	 * @param  options Optional options (see https://nodejs.org/api/fs.html#fs_fs_createwritestream_path_options)
 	 */
-	constructor(path: string, options?: {
-		flags?: string;
-		encoding?: string;
-		string?: string;
-	}) {
+	constructor(
+		path: string,
+		options?:
+			| string
+			| {
+					flags?: string;
+					encoding?: BufferEncoding;
+					fd?: number;
+					mode?: number;
+					autoClose?: boolean;
+					emitClose?: boolean;
+					start?: number;
+					highWaterMark?: number;
+			  }
+	) {
 		super();
 		pipeToNodeStream(this, fs.createWriteStream(path, options));
 	}
