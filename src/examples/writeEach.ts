@@ -13,17 +13,19 @@ import { delay } from "../lib/util";
 // Create a source that produces numbers 0, 1, 2, 3
 let i = 0;
 const source = new Stream<number>();
-source.writeEach(() => {
-	if (i === 4) {
-		console.log("writing end");
-		return; // Signal EOF, we won't be called again
-	}
-	console.log("writing", i);
-	return i++;
-}).then(
-	() => console.log("writeEach() ok"),
-	(err) => console.log("writeEach() error", err)
-);
+source
+	.writeEach(() => {
+		if (i === 4) {
+			console.log("writing end");
+			return; // Signal EOF, we won't be called again
+		}
+		console.log("writing", i);
+		return i++;
+	})
+	.then(
+		() => console.log("writeEach() ok"),
+		(err) => console.log("writeEach() error", err)
+	);
 
 // Read values, delay 1 second before 'returning'
 source.forEach(

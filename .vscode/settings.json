@@ -5,8 +5,8 @@
 		"**/.git": true,
 		"**/.svn": true,
 		"**/.DS_Store": true,
-		"**/*.js": { "when": "$(basename).ts"},
-		"**/*.map": { "when": "$(basename)"}
+		"**/*.js": { "when": "$(basename).ts" },
+		"**/*.map": { "when": "$(basename)" }
 	},
 	"markdownlint.config": {
 		"default": true,

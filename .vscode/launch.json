@@ -24,9 +24,7 @@
 			"request": "launch",
 			"name": "Launch Program",
 			"program": "${workspaceFolder}\\dist\\lib\\index.js",
-			"outFiles": [
-				"${workspaceFolder}/**/*.js"
-			]
+			"outFiles": ["${workspaceFolder}/**/*.js"]
 		}
 	]
 }

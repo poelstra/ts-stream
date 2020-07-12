@@ -7,7 +7,8 @@
 		"test": "npm run -s lint && npm run -s build && npm run -s mocha",
 		"mocha": "mocha",
 		"cover": "npm run -s build && nyc npm -s run mocha",
-		"lint": "tslint -t verbose src/**/*.ts",
+		"lint": "tslint --format verbose -p src/lib && tslint --format verbose -p src/test/ && tslint --format verbose -p src/examples/ && prettier --check 'src/{lib,test,examples}/*.ts' '*.json' '*.yml' '.vscode/*.json'",
+		"format": "prettier --write 'src/{lib,test,examples}/*.ts' '*.json' '*.yml' '.vscode/*.json'",
 		"prepare": "npm run -s test",
 		"prepublishOnly": "npm run -s prepare",
 		"build": "tsc -p src/lib/ && tsc -p src/test/ && tsc -p src/examples",
@@ -41,8 +42,10 @@
 		"coveralls": "^3.1.0",
 		"mocha": "^8.0.1",
 		"nyc": "^15.1.0",
+		"prettier": "^2.0.5",
 		"source-map-support": "^0.5.19",
-		"tslint": "^5.11.0",
+		"tslint": "^6.1.2",
+		"tslint-config-prettier": "^1.18.0",
 		"typescript": "^3.1.3"
 	}
 }

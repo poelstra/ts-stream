@@ -10,7 +10,13 @@
 
 import { expect } from "chai";
 
-import { AlreadyHaveReaderError, ReadableStream, Stream, Transform, WriteAfterEndError } from "../lib/index";
+import {
+	AlreadyHaveReaderError,
+	ReadableStream,
+	Stream,
+	Transform,
+	WriteAfterEndError,
+} from "../lib/index";
 
 import "./mocha-init";
 import { defer, delay, settle, swallowErrors, track } from "./util";
@@ -18,11 +24,11 @@ import { defer, delay, settle, swallowErrors, track } from "./util";
 function readInto<T>(stream: ReadableStream<T>, into: T[]): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
 		stream.forEach(
-			function(this: any, value: T): void {
+			function (this: any, value: T): void {
 				expect(this).to.equal(undefined);
 				into.push(value);
 			},
-			function(this: any, err?: Error): void {
+			function (this: any, err?: Error): void {
 				expect(this).to.equal(undefined);
 				if (err) {
 					reject(err);
@@ -93,9 +99,11 @@ describe("Stream", () => {
 
 	it("disallows write after end", async () => {
 		promises.push(s.end());
-		promises.push(s.write(42).catch((r) => {
-			expect(r).to.be.instanceof(WriteAfterEndError);
-		}));
+		promises.push(
+			s.write(42).catch((r) => {
+				expect(r).to.be.instanceof(WriteAfterEndError);
+			})
+		);
 		promises.push(readInto(s, results));
 		await settle(promises);
 		expect(results).to.deep.equal([]);
@@ -184,17 +192,19 @@ describe("Stream", () => {
 			const w1 = track(s.write(1));
 			const w2 = track(s.write(2));
 
-			swallowErrors(s.forEach(
-				(v) => {
-					results.push(v);
-					return reads.shift();
-				},
-				(err) => {
-					endResult = err;
-					endSeen.resolve();
-					return endDef.promise;
-				}
-			));
+			swallowErrors(
+				s.forEach(
+					(v) => {
+						results.push(v);
+						return reads.shift();
+					},
+					(err) => {
+						endResult = err;
+						endSeen.resolve();
+						return endDef.promise;
+					}
+				)
+			);
 
 			await delay(1);
 			expect(w1.isPending).to.equal(true);
@@ -245,10 +255,17 @@ describe("Stream", () => {
 			const w1 = track(s.write(1));
 			const w2 = track(s.write(2));
 			const r1 = defer();
-			swallowErrors(s.forEach(
-				(v) => { s.abort(abortError); return r1.promise; },
-				(e) => { endResult = e; }
-			));
+			swallowErrors(
+				s.forEach(
+					(v) => {
+						s.abort(abortError);
+						return r1.promise;
+					},
+					(e) => {
+						endResult = e;
+					}
+				)
+			);
 			await delay(1);
 			expect(w1.isPending).to.equal(true);
 			expect(w2.isPending).to.equal(true);
@@ -274,8 +291,12 @@ describe("Stream", () => {
 			const firstAbortError = new Error("first abort error");
 			s.abort(firstAbortError);
 			s.forEach(
-				(v) => { chai.assert(false); },
-				(e) => { endResult = e; }
+				(v) => {
+					chai.assert(false);
+				},
+				(e) => {
+					endResult = e;
+				}
 			);
 
 			await settle([w1.promise]);
@@ -296,7 +317,9 @@ describe("Stream", () => {
 			s.forEach(
 				(v) => r1.promise,
 				undefined,
-				(e) => { abortResult = e; }
+				(e) => {
+					abortResult = e;
+				}
 			);
 			await delay(1);
 
@@ -347,14 +370,16 @@ describe("Stream", () => {
 
 			let abortResult: Error | null | undefined = null;
 			const abortSeen = defer();
-			swallowErrors(s.forEach(
-				(v) => undefined,
-				undefined,
-				(e) => {
-					abortResult = e;
-					abortSeen.resolve();
-				}
-			));
+			swallowErrors(
+				s.forEach(
+					(v) => undefined,
+					undefined,
+					(e) => {
+						abortResult = e;
+						abortSeen.resolve();
+					}
+				)
+			);
 			expect(abortResult).to.equal(null);
 
 			await abortSeen.promise;
@@ -367,7 +392,9 @@ describe("Stream", () => {
 			s.forEach(
 				(v) => undefined,
 				undefined,
-				(e) => { abortResult = e; }
+				(e) => {
+					abortResult = e;
+				}
 			);
 
 			await settle([w1.promise, we.promise]);
@@ -417,7 +444,11 @@ describe("Stream", () => {
 	describe("forEach()", () => {
 		it("handles empty stream", async () => {
 			let endResult: Error | null | undefined = null; // null, to distinguish from 'undefined' that gets assigned by ender
-			const res = track(s.forEach(pushResult, (e?: Error) => { endResult = e; }));
+			const res = track(
+				s.forEach(pushResult, (e?: Error) => {
+					endResult = e;
+				})
+			);
 			s.end();
 			await res.promise;
 			expect(results).to.deep.equal([]);
@@ -427,7 +458,11 @@ describe("Stream", () => {
 
 		it("handles a single value", async () => {
 			let endResult: Error | null | undefined = null; // null, to distinguish from 'undefined' that gets assigned by ender
-			const res = track(s.forEach(pushResult, (e?: Error) => { endResult = e; }));
+			const res = track(
+				s.forEach(pushResult, (e?: Error) => {
+					endResult = e;
+				})
+			);
 			s.write(1);
 			s.end();
 			await res.promise;
@@ -438,7 +473,11 @@ describe("Stream", () => {
 
 		it("handles multiple values", async () => {
 			let endResult: Error | null | undefined = null; // null, to distinguish from 'undefined' that gets assigned by ender
-			const res = track(s.forEach(pushResult, (e?: Error) => { endResult = e; }));
+			const res = track(
+				s.forEach(pushResult, (e?: Error) => {
+					endResult = e;
+				})
+			);
 			s.write(1);
 			s.write(2);
 			s.write(3);
@@ -454,10 +493,16 @@ describe("Stream", () => {
 			// Allows writer to decide to send another value, abort, end normally, etc.
 			const endError = new Error("end boom");
 			let endResult: Error | null | undefined = null; // null, to distinguish from 'undefined' that gets assigned by ender
-			const res = track(s.forEach(
-				(n) => { throw boomError; },
-				(e?: Error) => { endResult = e; }
-			));
+			const res = track(
+				s.forEach(
+					(n) => {
+						throw boomError;
+					},
+					(e?: Error) => {
+						endResult = e;
+					}
+				)
+			);
 
 			// Write a value, will be rejected by reader and returned from write
 			const wp = track(s.write(1));
@@ -475,9 +520,11 @@ describe("Stream", () => {
 		});
 
 		it("can use a default ender", async () => {
-			const res = track(s.forEach(
-				(v) => { results.push(v); }
-			));
+			const res = track(
+				s.forEach((v) => {
+					results.push(v);
+				})
+			);
 			s.write(1);
 			s.write(2);
 			s.end();
@@ -487,9 +534,11 @@ describe("Stream", () => {
 		});
 
 		it("returns errors by default, but does not bounce them (#35)", async () => {
-			const res = track(s.forEach(
-				(v) => { results.push(v); }
-			));
+			const res = track(
+				s.forEach((v) => {
+					results.push(v);
+				})
+			);
 			s.write(1);
 			s.write(2);
 			const we = track(s.end(boomError));
@@ -661,7 +710,11 @@ describe("Stream", () => {
 	describe("map()", () => {
 		it("maps values", async () => {
 			const mapped = s.map((n) => n * 2);
-			const writes = [track(s.write(1)), track(s.write(2)), track(s.end())];
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
 			readInto(mapped, results);
 			await s.result();
 			expect(results).to.deep.equal([2, 4]);
@@ -678,7 +731,11 @@ describe("Stream", () => {
 					return n * 2;
 				}
 			});
-			const writes = [track(s.write(1)), track(s.write(2)), track(s.end())];
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
 			writes.forEach((t): void => {
 				swallowErrors(t.promise);
 			});
@@ -698,7 +755,11 @@ describe("Stream", () => {
 					return n * 2;
 				}
 			});
-			const writes = [track(s.write(1)), track(s.write(2)), track(s.end())];
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
 			writes.forEach((t): void => {
 				swallowErrors(t.promise);
 			});
@@ -712,16 +773,22 @@ describe("Stream", () => {
 
 		it("waits for source stream to end", async () => {
 			const d = defer();
-			const slowEndingSource = s.transform<number>((readable, writable) => {
-				readable.forEach(
-					(v) => writable.write(v),
-					(error?: Error) => {
-						writable.end(error, readable.result());
-						return d.promise;
-					}
-				);
-			});
-			const writes = [track(s.write(1)), track(s.write(2)), track(s.end())];
+			const slowEndingSource = s.transform<number>(
+				(readable, writable) => {
+					readable.forEach(
+						(v) => writable.write(v),
+						(error?: Error) => {
+							writable.end(error, readable.result());
+							return d.promise;
+						}
+					);
+				}
+			);
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
 
 			const mapped = slowEndingSource.map((n) => n * 2);
 			const mres = track(mapped.result());
@@ -741,7 +808,10 @@ describe("Stream", () => {
 
 		it("waits for destination stream to end", async () => {
 			const d = defer();
-			const slowEnder: Transform<number, number> = (readable, writable) => {
+			const slowEnder: Transform<number, number> = (
+				readable,
+				writable
+			) => {
 				readable.forEach(
 					(v) => writable.write(v),
 					(error?: Error) => {
@@ -777,7 +847,10 @@ describe("Stream", () => {
 			let endResult: Error | null | undefined = null;
 			const mapped = s.map(
 				(n) => n * 2,
-				(e) => { endResult = e; return d.promise; }
+				(e) => {
+					endResult = e;
+					return d.promise;
+				}
 			);
 			readInto(mapped, results);
 			const w1 = track(s.write(1));
@@ -801,7 +874,10 @@ describe("Stream", () => {
 			let endResult: Error | null | undefined = null;
 			const mapped = s.map(
 				(n) => n * 2,
-				(e) => { endResult = e; return d.promise; }
+				(e) => {
+					endResult = e;
+					return d.promise;
+				}
 			);
 			const r = track(readInto(mapped, results));
 			const w1 = track(s.write(1));
@@ -832,7 +908,10 @@ describe("Stream", () => {
 			let endResult: Error | null | undefined = null;
 			const mapped = s.map(
 				(n) => n * 2,
-				(e) => { endResult = e; throw boomError; }
+				(e) => {
+					endResult = e;
+					throw boomError;
+				}
 			);
 			const r = track(readInto(mapped, results));
 			const w1 = track(s.write(1));
@@ -858,11 +937,16 @@ describe("Stream", () => {
 			let endResult: Error | null | undefined = null;
 			const mapped = s.map(
 				(n) => n * 2,
-				(e) => { endResult = e; throw boomError; }
+				(e) => {
+					endResult = e;
+					throw boomError;
+				}
 			);
 			let forEachEndResult: Error | null | undefined = null;
 			mapped.forEach(
-				(n) => { results.push(n); },
+				(n) => {
+					results.push(n);
+				},
 				(e) => {
 					forEachEndResult = e;
 					throw new Error("some other error");
@@ -892,7 +976,10 @@ describe("Stream", () => {
 			let mapEndResult: Error | null | undefined = null;
 			const mapped = s.map(
 				(n) => n * 2,
-				(e) => { mapEndResult = e; throw boomError; }
+				(e) => {
+					mapEndResult = e;
+					throw boomError;
+				}
 			);
 			const w1 = track(s.write(1));
 			const we = track(s.end(endError));
@@ -902,7 +989,9 @@ describe("Stream", () => {
 			let forEachEndResult: Error | null | undefined = null;
 			const d = defer();
 			mapped.forEach(
-				(n) => { results.push(n); },
+				(n) => {
+					results.push(n);
+				},
 				(e) => {
 					forEachEndResult = e;
 					return d.promise;
@@ -965,7 +1054,11 @@ describe("Stream", () => {
 	describe("filter()", () => {
 		it("filters values", async () => {
 			const filtered = s.filter((n) => n % 2 === 0);
-			const writes = [track(s.write(1)), track(s.write(2)), track(s.end())];
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
 			readInto(filtered, results);
 			await s.result();
 			expect(results).to.deep.equal([2]);
@@ -982,7 +1075,11 @@ describe("Stream", () => {
 					return n % 2 === 0;
 				}
 			});
-			const writes = [track(s.write(1)), track(s.write(2)), track(s.end())];
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
 			writes.forEach((t): void => {
 				swallowErrors(t.promise);
 			});
@@ -1002,7 +1099,11 @@ describe("Stream", () => {
 					return n % 2 === 0;
 				}
 			});
-			const writes = [track(s.write(1)), track(s.write(2)), track(s.end())];
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
 			writes.forEach((t): void => {
 				swallowErrors(t.promise);
 			});
@@ -1016,16 +1117,22 @@ describe("Stream", () => {
 
 		it("waits for source stream to end", async () => {
 			const d = defer();
-			const slowEndingSource = s.transform<number>((readable, writable) => {
-				readable.forEach(
-					(v) => writable.write(v),
-					(error?: Error) => {
-						writable.end(error, readable.result());
-						return d.promise;
-					}
-				);
-			});
-			const writes = [track(s.write(1)), track(s.write(2)), track(s.end())];
+			const slowEndingSource = s.transform<number>(
+				(readable, writable) => {
+					readable.forEach(
+						(v) => writable.write(v),
+						(error?: Error) => {
+							writable.end(error, readable.result());
+							return d.promise;
+						}
+					);
+				}
+			);
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
 
 			const filtered = slowEndingSource.filter((n) => n % 2 === 0);
 			const mres = track(filtered.result());
@@ -1045,7 +1152,10 @@ describe("Stream", () => {
 
 		it("waits for destination stream to end", async () => {
 			const d = defer();
-			const slowEnder: Transform<number, number> = (readable, writable) => {
+			const slowEnder: Transform<number, number> = (
+				readable,
+				writable
+			) => {
 				readable.forEach(
 					(v) => writable.write(v),
 					(error?: Error) => {
@@ -1081,7 +1191,10 @@ describe("Stream", () => {
 			let endResult: Error | null | undefined = null;
 			const filtered = s.filter(
 				(n) => true,
-				(e) => { endResult = e; return d.promise; }
+				(e) => {
+					endResult = e;
+					return d.promise;
+				}
 			);
 			readInto(filtered, results);
 			const w1 = track(s.write(1));
@@ -1105,7 +1218,10 @@ describe("Stream", () => {
 			let endResult: Error | null | undefined = null;
 			const filtered = s.filter(
 				(n) => true,
-				(e) => { endResult = e; return d.promise; }
+				(e) => {
+					endResult = e;
+					return d.promise;
+				}
 			);
 			const r = track(readInto(filtered, results));
 			const w1 = track(s.write(1));
@@ -1136,7 +1252,10 @@ describe("Stream", () => {
 			let endResult: Error | null | undefined = null;
 			const filtered = s.filter(
 				(n) => true,
-				(e) => { endResult = e; throw boomError; }
+				(e) => {
+					endResult = e;
+					throw boomError;
+				}
 			);
 			const r = track(readInto(filtered, results));
 			const w1 = track(s.write(1));
@@ -1162,11 +1281,16 @@ describe("Stream", () => {
 			let endResult: Error | null | undefined = null;
 			const filtered = s.filter(
 				(n) => true,
-				(e) => { endResult = e; throw boomError; }
+				(e) => {
+					endResult = e;
+					throw boomError;
+				}
 			);
 			let forEachEndResult: Error | null | undefined = null;
 			filtered.forEach(
-				(n) => { results.push(n); },
+				(n) => {
+					results.push(n);
+				},
 				(e) => {
 					forEachEndResult = e;
 					throw new Error("some other error");
@@ -1196,7 +1320,10 @@ describe("Stream", () => {
 			let mapEndResult: Error | null | undefined = null;
 			const filtered = s.filter(
 				(n) => true,
-				(e) => { mapEndResult = e; throw boomError; }
+				(e) => {
+					mapEndResult = e;
+					throw boomError;
+				}
 			);
 			const w1 = track(s.write(1));
 			const we = track(s.end(endError));
@@ -1206,7 +1333,9 @@ describe("Stream", () => {
 			let forEachEndResult: Error | null | undefined = null;
 			const d = defer();
 			filtered.forEach(
-				(n) => { results.push(n); },
+				(n) => {
+					results.push(n);
+				},
 				(e) => {
 					forEachEndResult = e;
 					return d.promise;
@@ -1281,10 +1410,10 @@ describe("Stream", () => {
 
 		it("can be used to implement toArray()", async () => {
 			const x = Stream.from([1, 2, 3, 4]);
-			const value = await x.reduce(
-				(arr: number[], v: number) => { arr.push(v); return arr; },
-				[]
-			);
+			const value = await x.reduce((arr: number[], v: number) => {
+				arr.push(v);
+				return arr;
+			}, []);
 			expect(value).to.deep.equal([1, 2, 3, 4]);
 		});
 
@@ -1384,7 +1513,11 @@ describe("Stream", () => {
 		});
 
 		it("returns thrown error to writer", async () => {
-			const reduceResult = track(s.reduce((prev, curr): number => { throw boomError; }, 0));
+			const reduceResult = track(
+				s.reduce((prev, curr): number => {
+					throw boomError;
+				}, 0)
+			);
 			const writeResult = track(s.write(1));
 			await settle([writeResult.promise]);
 			expect(reduceResult.isPending).to.equal(true);
@@ -1395,7 +1528,9 @@ describe("Stream", () => {
 		});
 
 		it("returns rejected error to writer", async () => {
-			const reduceResult = track(s.reduce((prev, curr) => Promise.reject<number>(boomError), 0));
+			const reduceResult = track(
+				s.reduce((prev, curr) => Promise.reject<number>(boomError), 0)
+			);
 			const writeResult = track(s.write(1));
 			await settle([writeResult.promise]);
 			expect(reduceResult.isPending).to.equal(true);
@@ -1469,7 +1604,9 @@ describe("Stream", () => {
 		it("calls callback until undefined is returned", async () => {
 			const values = [1, 2, undefined, 3];
 			const writeResult = track(s.writeEach(() => values.shift()));
-			await s.forEach((v) => { results.push(v); });
+			await s.forEach((v) => {
+				results.push(v);
+			});
 			expect(s.isEnded()).to.equal(true);
 			expect(results).to.deep.equal([1, 2]);
 			expect(values).to.deep.equal([3]);
@@ -1482,7 +1619,9 @@ describe("Stream", () => {
 			await delay(1);
 			expect(values).to.deep.equal([2]);
 
-			const fe = s.forEach((v) => { results.push(v); });
+			const fe = s.forEach((v) => {
+				results.push(v);
+			});
 			await settle([fe, writeResult.promise]);
 			expect(results).to.deep.equal([1, 2]);
 			expect(writeResult.isFulfilled).to.equal(true);
@@ -1490,7 +1629,11 @@ describe("Stream", () => {
 
 		it("handles synchronous exception in writer", async () => {
 			swallowErrors(s.result());
-			const writeResult = track(s.writeEach(() => { throw boomError; }));
+			const writeResult = track(
+				s.writeEach(() => {
+					throw boomError;
+				})
+			);
 			const fe = s.forEach(noop);
 			await settle([fe, writeResult.promise]);
 			expect(s.isEnded()).to.equal(true);
@@ -1499,8 +1642,12 @@ describe("Stream", () => {
 
 		it("handles all values and stream end as promises", async () => {
 			const values = [1, 2];
-			const writeResult = track(s.writeEach(() => Promise.resolve(values.shift())));
-			const fe = s.forEach((v) => { results.push(v); });
+			const writeResult = track(
+				s.writeEach(() => Promise.resolve(values.shift()))
+			);
+			const fe = s.forEach((v) => {
+				results.push(v);
+			});
 			await settle([fe, writeResult.promise]);
 			expect(results).to.deep.equal([1, 2]);
 			expect(writeResult.isFulfilled).to.equal(true);
@@ -1512,15 +1659,23 @@ describe("Stream", () => {
 			const values = [1, 2, 3];
 			const writeResult = track(s.writeEach(() => values.shift()));
 			let endResult: Error | null | undefined = null;
-			const forEachResult = track(s.forEach(
-				(v) => {
-					if (v === 2) {
-						return Promise.reject(boomError);
+			const forEachResult = track(
+				s.forEach(
+					(v) => {
+						if (v === 2) {
+							return Promise.reject(boomError);
+						}
+					},
+					(error?: Error) => {
+						endResult = error;
 					}
-				},
-				(error?: Error) => { endResult = error; }
-			));
-			await settle([ab.promise, forEachResult.promise, writeResult.promise]);
+				)
+			);
+			await settle([
+				ab.promise,
+				forEachResult.promise,
+				writeResult.promise,
+			]);
 			expect(values).to.deep.equal([3]);
 			expect(s.isEnded()).to.equal(true);
 			expect(ab.reason).to.equal(boomError);
@@ -1534,11 +1689,14 @@ describe("Stream", () => {
 			const ab = track(s.aborted());
 			const values = [1, 2];
 			const writeResult = track(s.writeEach(() => values.shift()));
-			const forEachResult = track(s.forEach(
-				noop,
-				(error?: Error) => Promise.reject(boomError)
-			));
-			await settle([ab.promise, forEachResult.promise, writeResult.promise]);
+			const forEachResult = track(
+				s.forEach(noop, (error?: Error) => Promise.reject(boomError))
+			);
+			await settle([
+				ab.promise,
+				forEachResult.promise,
+				writeResult.promise,
+			]);
 			expect(values).to.deep.equal([]);
 			expect(s.isEnded()).to.equal(true);
 			expect(ab.reason).to.equal(boomError);
@@ -1552,11 +1710,14 @@ describe("Stream", () => {
 			const values = [1, 2];
 			const writeResult = track(s.writeEach(() => values.shift()));
 			s.abort(abortError);
-			const forEachResult = track(s.forEach(
-				noop,
-				(error?: Error) => Promise.reject(boomError)
-			));
-			await settle([ab.promise, forEachResult.promise, writeResult.promise]);
+			const forEachResult = track(
+				s.forEach(noop, (error?: Error) => Promise.reject(boomError))
+			);
+			await settle([
+				ab.promise,
+				forEachResult.promise,
+				writeResult.promise,
+			]);
 			expect(values).to.deep.equal([1, 2]);
 			expect(s.isEnded()).to.equal(true);
 			expect(ab.reason).to.equal(abortError);
@@ -1569,15 +1730,17 @@ describe("Stream", () => {
 			swallowErrors(s.aborted());
 			const values = [1, 2, 3];
 			const writeResult = track(s.writeEach(() => values.shift()));
-			const forEachResult = track(s.forEach(
-				(v) => {
-					if (v === 2) {
-						return Promise.reject(boomError);
+			const forEachResult = track(
+				s.forEach(
+					(v) => {
+						if (v === 2) {
+							return Promise.reject(boomError);
+						}
 					}
-				}
-				// Note: no end handler, so default, which 'bounces' the given
-				// error
-			));
+					// Note: no end handler, so default, which 'bounces' the given
+					// error
+				)
+			);
 			await settle([forEachResult.promise, writeResult.promise]);
 			expect(values).to.deep.equal([3]);
 			expect(s.isEnded()).to.equal(true);
@@ -1592,10 +1755,14 @@ describe("Stream", () => {
 			const writeResult = track(s.writeEach(() => values.shift()));
 			let endResult: Error | null | undefined = null;
 			const d = defer();
-			const forEachResult = track(s.forEach(
-				(v) => d.promise,
-				(err?) => { endResult = err; }
-			));
+			const forEachResult = track(
+				s.forEach(
+					(v) => d.promise,
+					(err?) => {
+						endResult = err;
+					}
+				)
+			);
 			await delay(1);
 			expect(values).to.deep.equal([2, 3]);
 			s.abort(abortError);
@@ -1610,7 +1777,9 @@ describe("Stream", () => {
 
 		it("asynchronously calls writer", async () => {
 			let called = false;
-			s.writeEach(() => { called = true; });
+			s.writeEach(() => {
+				called = true;
+			});
 			expect(called).to.equal(false);
 		});
 
@@ -1618,10 +1787,14 @@ describe("Stream", () => {
 			swallowErrors(s.aborted());
 			const d = defer();
 			let called = false;
-			swallowErrors(s.writeEach(
-				() => d.promise,
-				() => { called = true; }
-			));
+			swallowErrors(
+				s.writeEach(
+					() => d.promise,
+					() => {
+						called = true;
+					}
+				)
+			);
 			await delay(1); // ensure writer is called
 			s.abort();
 			await delay(1);
@@ -1636,7 +1809,10 @@ describe("Stream", () => {
 			s.forEach(noop); // flush stream
 			await s.writeEach(
 				() => undefined,
-				(...args) => { expect(args.length).to.equal(0); called = true; }
+				(...args) => {
+					expect(args.length).to.equal(0);
+					called = true;
+				}
 			);
 			expect(called).to.equal(true);
 		});
@@ -1645,8 +1821,13 @@ describe("Stream", () => {
 			let called = false;
 			s.forEach(noop); // flush stream
 			const writeEachResult = s.writeEach(
-				() => { throw new Error("boom"); },
-				(err) => { expect(err && err.message).to.equal("boom"); called = true; }
+				() => {
+					throw new Error("boom");
+				},
+				(err) => {
+					expect(err && err.message).to.equal("boom");
+					called = true;
+				}
 			);
 			await writeEachResult.catch(noop);
 			expect(called).to.equal(true);
@@ -1656,9 +1837,14 @@ describe("Stream", () => {
 			let called = false;
 			s.forEach(noop); // flush stream
 			const writeEachResult = s.writeEach(
-				() => { throw new Error("boom"); },
+				() => {
+					throw new Error("boom");
+				},
 				noop,
-				(err) => { expect(err.message).to.equal("boom"); called = true; }
+				(err) => {
+					expect(err.message).to.equal("boom");
+					called = true;
+				}
 			);
 			await writeEachResult.catch(noop);
 			expect(called).to.equal(true);
@@ -1669,9 +1855,14 @@ describe("Stream", () => {
 			swallowErrors(s.aborted());
 			s.forEach(noop); // flush stream
 			const writeEachResult = s.writeEach(
-				() => { throw new Error("boom"); },
+				() => {
+					throw new Error("boom");
+				},
 				noop,
-				(err) => { expect(err.message).to.equal("boom"); called = true; }
+				(err) => {
+					expect(err.message).to.equal("boom");
+					called = true;
+				}
 			);
 			await writeEachResult.catch(noop);
 			expect(called).to.equal(true);
@@ -1682,11 +1873,17 @@ describe("Stream", () => {
 			const d = defer();
 			let enderCalled = 0;
 			let aborterCalled = 0;
-			swallowErrors(s.writeEach(
-				() => d.promise,
-				() => { enderCalled++; },
-				() => { aborterCalled++; }
-			));
+			swallowErrors(
+				s.writeEach(
+					() => d.promise,
+					() => {
+						enderCalled++;
+					},
+					() => {
+						aborterCalled++;
+					}
+				)
+			);
 			await delay(1); // ensure writer is called
 			s.abort();
 			await delay(1);
@@ -1702,11 +1899,17 @@ describe("Stream", () => {
 			swallowErrors(s.aborted());
 			let enderCalled = 0;
 			let aborterCalled = 0;
-			swallowErrors(s.writeEach(
-				() => undefined,
-				() => { enderCalled++; },
-				() => { aborterCalled++; }
-			));
+			swallowErrors(
+				s.writeEach(
+					() => undefined,
+					() => {
+						enderCalled++;
+					},
+					() => {
+						aborterCalled++;
+					}
+				)
+			);
 			await delay(1); // ensure writer is called
 			expect(enderCalled).to.equal(1);
 			expect(aborterCalled).to.equal(0);
@@ -1720,32 +1923,44 @@ describe("Stream", () => {
 	describe("from()", () => {
 		it("produces all values, then ends", async () => {
 			const x = Stream.from([1, 2]);
-			await x.forEach((v) => { results.push(v); });
+			await x.forEach((v) => {
+				results.push(v);
+			});
 			expect(x.isEnded()).to.equal(true);
 			expect(results).to.deep.equal([1, 2]);
 		});
 
 		it("supports promise for array", async () => {
 			const x = Stream.from(Promise.resolve([1, 2]));
-			await x.forEach((v) => { results.push(v); });
+			await x.forEach((v) => {
+				results.push(v);
+			});
 			expect(results).to.deep.equal([1, 2]);
 		});
 
 		it("supports array of promises", async () => {
 			const x = Stream.from([Promise.resolve(1), Promise.resolve(2)]);
-			await x.forEach((v) => { results.push(v); });
+			await x.forEach((v) => {
+				results.push(v);
+			});
 			expect(results).to.deep.equal([1, 2]);
 		});
 
 		it("supports promise for array of promises", async () => {
-			const x = Stream.from<number>(Promise.resolve([Promise.resolve(1), Promise.resolve(2)]));
-			await x.forEach((v: number) => { results.push(v); });
+			const x = Stream.from<number>(
+				Promise.resolve([Promise.resolve(1), Promise.resolve(2)])
+			);
+			await x.forEach((v: number) => {
+				results.push(v);
+			});
 			expect(results).to.deep.equal([1, 2]);
 		});
 
 		it("ends on first undefined", async () => {
 			const x = Stream.from<any>([1, 2, undefined, 3]);
-			await x.forEach((v) => { results.push(v); });
+			await x.forEach((v) => {
+				results.push(v);
+			});
 			expect(x.isEnded()).to.equal(true);
 			expect(results).to.deep.equal([1, 2]);
 		});
@@ -1755,14 +1970,18 @@ describe("Stream", () => {
 			swallowErrors(x.result());
 			swallowErrors(x.aborted());
 			let endResult: Error | null | undefined = null;
-			const result = track(x.forEach(
-				(v) => {
-					if (v === 2) {
-						return Promise.reject(boomError);
+			const result = track(
+				x.forEach(
+					(v) => {
+						if (v === 2) {
+							return Promise.reject(boomError);
+						}
+					},
+					(error?: Error) => {
+						endResult = error;
 					}
-				},
-				(error?: Error) => { endResult = error; }
-			));
+				)
+			);
 			await settle([result.promise]);
 			expect(x.isEnded()).to.equal(true);
 			expect(endResult).to.equal(boomError);
@@ -1773,15 +1992,17 @@ describe("Stream", () => {
 			const x = Stream.from([1, 2]);
 			swallowErrors(x.result());
 			swallowErrors(x.aborted());
-			const result = track(x.forEach(
-				(v) => {
-					if (v === 2) {
-						return Promise.reject(boomError);
+			const result = track(
+				x.forEach(
+					(v) => {
+						if (v === 2) {
+							return Promise.reject(boomError);
+						}
 					}
-				}
-				// Note: no end handler, so default, which 'bounces' the given
-				// error
-			));
+					// Note: no end handler, so default, which 'bounces' the given
+					// error
+				)
+			);
 			await settle([result.promise]);
 			expect(x.isEnded()).to.equal(true);
 			expect(result.reason).to.equal(boomError);
@@ -1793,10 +2014,14 @@ describe("Stream", () => {
 			swallowErrors(x.aborted());
 			let endResult: Error | null | undefined = null;
 			const d = defer();
-			const result = track(x.forEach(
-				(v) => d.promise,
-				(err?) => { endResult = err; }
-			));
+			const result = track(
+				x.forEach(
+					(v) => d.promise,
+					(err?) => {
+						endResult = err;
+					}
+				)
+			);
 			await delay(1);
 			x.abort(abortError);
 			d.resolve();
@@ -1811,11 +2036,9 @@ describe("Stream", () => {
 		it("should not result in unhandled rejections", (done) => {
 			const result = new Stream();
 			const stream = new Stream();
-			stream.end(new Error("foo"))
-				.catch((error) => undefined);
+			stream.end(new Error("foo")).catch((error) => undefined);
 			stream.pipe(result);
-			result.forEach(() => undefined)
-				.catch(() => undefined);
+			result.forEach(() => undefined).catch(() => undefined);
 			setTimeout(done, 10);
 		});
 
@@ -1838,29 +2061,27 @@ describe("Stream", () => {
 
 			let ended = false;
 			let finished = false;
-			result.forEach(
-				() => undefined,
-				(e) => {
-					ended = true;
-					throw e;
-				}
-			).catch(() => { finished = true; });
+			result
+				.forEach(
+					() => undefined,
+					(e) => {
+						ended = true;
+						throw e;
+					}
+				)
+				.catch(() => {
+					finished = true;
+				});
 
-			setTimeout(
-				() => {
-					expect(ended).to.equal(true);
-					expect(finished).to.equal(false);
-					d.resolve();
-					setTimeout(
-						() => {
-							expect(finished).to.equal(true);
-							done();
-						},
-						10
-					);
-				},
-				10
-			);
+			setTimeout(() => {
+				expect(ended).to.equal(true);
+				expect(finished).to.equal(false);
+				d.resolve();
+				setTimeout(() => {
+					expect(finished).to.equal(true);
+					done();
+				}, 10);
+			}, 10);
 		});
 	});
 });

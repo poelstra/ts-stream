@@ -1,4 +1,3 @@
-
 // Mocha swallows unhandled rejections by default, making all your tests pass on unhandled rejections.
 // For synchronous tests, unhandled rejections are only detected after the test finishes.
 // Therefore we cannot make the specific test that caused the unhandled rejection fail. What we can

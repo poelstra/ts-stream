@@ -7,7 +7,14 @@
 
 import { expect } from "chai";
 
-import { Readable, ReadableStream, Stream, Transform, Writable, WritableStream } from "../lib/index";
+import {
+	Readable,
+	ReadableStream,
+	Stream,
+	Transform,
+	Writable,
+	WritableStream,
+} from "../lib/index";
 import { delay, noop, settle } from "./util";
 
 enum MockDatabaseState {
@@ -90,10 +97,16 @@ class MockDatabase<T> {
 	}
 
 	public assertState(state: MockDatabaseState): void {
-		expect(MockDatabaseState[this._state], "invalid database state").to.equal(MockDatabaseState[state]);
+		expect(
+			MockDatabaseState[this._state],
+			"invalid database state"
+		).to.equal(MockDatabaseState[state]);
 	}
 
-	private _transition(expectedState: MockDatabaseState, newState: MockDatabaseState): void {
+	private _transition(
+		expectedState: MockDatabaseState,
+		newState: MockDatabaseState
+	): void {
 		this.assertState(expectedState);
 		this._state = newState;
 	}
@@ -107,7 +120,10 @@ class MockDatabase<T> {
  * This ensures that other elements in the stream also wait until
  * the resource is fully cleaned up before settling their .result().
  */
-async function idiomaticSource<T>(db: MockDatabase<T>, destination: WritableStream<T>): Promise<void> {
+async function idiomaticSource<T>(
+	db: MockDatabase<T>,
+	destination: WritableStream<T>
+): Promise<void> {
 	// Note: if needed, db.open() can be moved inside the reader, which ensures that
 	// abort can be called even while still opening the database to cancel that, too.
 	await db.open();
@@ -126,7 +142,10 @@ async function idiomaticSource<T>(db: MockDatabase<T>, destination: WritableStre
  * This ensures that other elements in the stream also wait until
  * the resource is fully cleaned up before settling their .result().
  */
-async function idiomaticSink<T>(source: ReadableStream<T>, db: MockDatabase<T>): Promise<void> {
+async function idiomaticSink<T>(
+	source: ReadableStream<T>,
+	db: MockDatabase<T>
+): Promise<void> {
 	// Note: if needed, db.open() can be moved inside the writer, which ensures that
 	// abort can be called even while still opening the database to cancel that, too.
 	await db.open();
@@ -148,7 +167,10 @@ async function idiomaticSink<T>(source: ReadableStream<T>, db: MockDatabase<T>):
  * This ensures that other elements in the stream also wait until
  * the resource is fully cleaned up before settling their .result().
  */
-async function idiomaticManualSource<T>(db: MockDatabase<T>, destination: Stream<T>): Promise<void> {
+async function idiomaticManualSource<T>(
+	db: MockDatabase<T>,
+	destination: Stream<T>
+): Promise<void> {
 	let endError: Error | undefined;
 	try {
 		try {
@@ -183,7 +205,9 @@ async function idiomaticManualSource<T>(db: MockDatabase<T>, destination: Stream
  * other elements in the chain. Ensures final stream captures result of all
  * previous streams.
  */
-function createTransform<T, R>(transformer: (value: T) => R | PromiseLike<R>): Transform<T, R> {
+function createTransform<T, R>(
+	transformer: (value: T) => R | PromiseLike<R>
+): Transform<T, R> {
 	return function idiomaticTransform(
 		readable: Readable<T>,
 		writable: Writable<R>
@@ -247,12 +271,27 @@ describe("idiomatic examples", () => {
 
 				it("waits before starting next", async () => {
 					const stream1 = new Stream<number>();
-					await Promise.all([testSource(sourceDb, stream1), testSink(stream1, destDb)]);
+					await Promise.all([
+						testSource(sourceDb, stream1),
+						testSink(stream1, destDb),
+					]);
 					// source and destination should both be in Closed state again
 					sourceDb.setValues([5, 6, 7, 8]);
 					const stream2 = new Stream<number>();
-					await Promise.all([testSource(sourceDb, stream2), testSink(stream2, destDb)]);
-					expect(destDb.getValues()).to.deep.equal([1, 2, 3, 4, 5, 6, 7, 8]);
+					await Promise.all([
+						testSource(sourceDb, stream2),
+						testSink(stream2, destDb),
+					]);
+					expect(destDb.getValues()).to.deep.equal([
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+					]);
 				});
 
 				it("ends stream even with abort", async () => {

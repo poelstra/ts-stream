@@ -54,7 +54,7 @@ export interface Deferred<T> {
 	 * This function is a free function (i.e. not a 'method' on this object).
 	 * Note: resolving with a rejected PromiseLike leads to a rejected promise.
 	 */
-	resolve: (value: T|PromiseLike<T>) => void;
+	resolve: (value: T | PromiseLike<T>) => void;
 }
 
 /**
@@ -79,7 +79,7 @@ export interface VoidDeferred extends Deferred<void> {
 	 * This function is a free function (i.e. not a 'method' on this object).
 	 * Note: resolving with a rejected PromiseLike leads to a rejected promise.
 	 */
-	resolve: (value?: void|PromiseLike<void>) => void;
+	resolve: (value?: void | PromiseLike<void>) => void;
 }
 
 /**
@@ -88,12 +88,17 @@ export interface VoidDeferred extends Deferred<void> {
 export function defer(): VoidDeferred;
 export function defer<T>(): Deferred<T>;
 export function defer<T>(): Deferred<T> {
-	let resolve: (value: T|PromiseLike<T>) => void;
+	let resolve: (value: T | PromiseLike<T>) => void;
 	let reject: (error: Error) => void;
-	const promise = new Promise((a: (value: T|PromiseLike<T>) => void, b: (error: Error) => void): void => {
-		resolve = a;
-		reject = b;
-	});
+	const promise = new Promise(
+		(
+			a: (value: T | PromiseLike<T>) => void,
+			b: (error: Error) => void
+		): void => {
+			resolve = a;
+			reject = b;
+		}
+	);
 	return { promise, reject: reject!, resolve: resolve! };
 }
 
@@ -142,21 +147,20 @@ export function track(p: PromiseLike<void>): TrackedVoidPromise;
 export function track<T>(p: PromiseLike<T>): TrackedPromise<T>;
 export function track<T>(p: PromiseLike<T>): TrackedPromise<T> {
 	let tracked: TrackedPromise<T>;
-	const trackedPromise = p
-		.then(
-			(value: T): T => {
-				tracked.isPending = false;
-				tracked.isFulfilled = true;
-				tracked.value = value;
-				return value;
-			},
-			(error: Error): T => {
-				tracked.isPending = false;
-				tracked.isRejected = true;
-				tracked.reason = error;
-				throw error;
-			}
-		);
+	const trackedPromise = p.then(
+		(value: T): T => {
+			tracked.isPending = false;
+			tracked.isFulfilled = true;
+			tracked.value = value;
+			return value;
+		},
+		(error: Error): T => {
+			tracked.isPending = false;
+			tracked.isRejected = true;
+			tracked.reason = error;
+			throw error;
+		}
+	);
 	tracked = {
 		isFulfilled: false,
 		isPending: true,

@@ -26,7 +26,7 @@ import { defer, swallowErrors, VoidDeferred } from "./util";
  * @see `pipeToNodeStream()` for easier error and completion handling.
  */
 export class NodeReadable<T> extends NodeStream.Readable {
-	private _resumer?: (value?: void|PromiseLike<void>) => void;
+	private _resumer?: (value?: void | PromiseLike<void>) => void;
 
 	/**
 	 * Create new NodeJS Readable based on given ts-stream Readable.
@@ -38,31 +38,33 @@ export class NodeReadable<T> extends NodeStream.Readable {
 	 */
 	constructor(tsReadable: Readable<T>, options?: NodeStream.ReadableOptions) {
 		super(options);
-		swallowErrors(tsReadable.forEach(
-			(chunk: any): void|Promise<void> => {
-				// Try to push data, returns true if there's still space
-				if (this.push(chunk)) {
-					return;
+		swallowErrors(
+			tsReadable.forEach(
+				(chunk: any): void | Promise<void> => {
+					// Try to push data, returns true if there's still space
+					if (this.push(chunk)) {
+						return;
+					}
+					// Stream blocked, wait until _read() is called
+					const d = defer();
+					this._resumer = d.resolve;
+					return d.promise;
+				},
+				(err?: Error) => {
+					if (err) {
+						this.emit("error", err);
+					}
+					this.push(null); // tslint:disable-line:no-null-keyword
+				},
+				(abortError: Error) => {
+					// Abort pending read, if necessary
+					if (this._resumer) {
+						this._resumer(Promise.reject(abortError));
+						this._resumer = undefined;
+					}
 				}
-				// Stream blocked, wait until _read() is called
-				const d = defer();
-				this._resumer = d.resolve;
-				return d.promise;
-			},
-			(err?: Error) => {
-				if (err) {
-					this.emit("error", err);
-				}
-				this.push(null); // tslint:disable-line:no-null-keyword
-			},
-			(abortError: Error) => {
-				// Abort pending read, if necessary
-				if (this._resumer) {
-					this._resumer(Promise.reject(abortError));
-					this._resumer = undefined;
-				}
-			}
-		));
+			)
+		);
 	}
 
 	public _read(size: number): void {
@@ -181,7 +183,7 @@ export function pipeToNodeStream<T>(
 	});
 
 	return tsReadable.forEach(
-		(chunk: any): void|Promise<void> => {
+		(chunk: any): void | Promise<void> => {
 			blockedDeferred = undefined;
 			// Try to push data, returns true if there's still space
 			const canAcceptMore = nodeWritable.write(chunk);
@@ -192,7 +194,7 @@ export function pipeToNodeStream<T>(
 				return blockedDeferred.promise;
 			}
 		},
-		(endError?: Error): Promise<void>  => {
+		(endError?: Error): Promise<void> => {
 			if (endError) {
 				handleTsStreamError(endError);
 			}
