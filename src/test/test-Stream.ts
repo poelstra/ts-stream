@@ -2134,6 +2134,78 @@ describe("Stream", () => {
 		const batchResults: number[][] = [];
 		beforeEach(() => batchResults.splice(0));
 
+		function pipeWithDelay(
+			readableStream: ReadableStream<{
+				value: number;
+				workTime?: number;
+				wait?: number;
+				abort?: boolean;
+				throwError?: true;
+			}>
+		) {
+			const writableStream = new Stream<{
+				value: number;
+				workTime?: number;
+				wait?: number;
+				abort?: boolean;
+				throwError?: true;
+			}>();
+
+			readableStream
+				.forEach(async (item) => {
+					const { wait } = item;
+
+					if (wait !== undefined) {
+						await delay(wait);
+						return writableStream.write(item);
+					} else {
+						return writableStream.write(item);
+					}
+				})
+				.then(() => writableStream.end());
+
+			return writableStream;
+		}
+
+		function resolveBatchToAsyncValues(
+			batch: {
+				value: number;
+				workTime?: number;
+				wait?: number;
+				abort?: boolean;
+				throwError?: boolean;
+			}[]
+		) {
+			const isDelay = !!batch.find(
+				({ workTime }) => workTime !== undefined
+			);
+
+			if (isDelay) {
+				const totalDelay = batch.reduce(
+					(acc, { workTime }) => acc + (workTime || 0),
+					0
+				);
+				console.log(JSON.stringify({ totalDelay: totalDelay }));
+				return (async () => {
+					await delay(totalDelay);
+					console.log(
+						`Resolving after delay ${JSON.stringify(
+							batch.map(({ value }) => value)
+						)}`
+					);
+
+					return batch.map(({ value }) => value);
+				})();
+			} else {
+				console.log(
+					`Resolving immediately ${JSON.stringify(
+						batch.map(({ value }) => value)
+					)}`
+				);
+				return batch.map(({ value }) => value);
+			}
+		}
+
 		it("batches values", async () => {
 			const batched = s.batch(2);
 			const toWrite = [1, 2, 3];
@@ -2147,14 +2219,33 @@ describe("Stream", () => {
 			writes.forEach((write) => expect(write.isFulfilled).to.equal(true));
 		});
 
-		it("eagerly forms batch when provided with minBatchSize", async () => {
+		it("forms batch if write not pending when provided with minBatchSize", async () => {
 			const source = Stream.from([
 				{
 					value: 1,
 				},
 				{
 					value: 2,
-					sleep: 1,
+				},
+				{
+					value: 3,
+				},
+			]);
+			const batched = source.batch(3, { minBatchSize: 2 });
+			const delayedProcessing = batched.map(resolveBatchToAsyncValues);
+
+			const dest = await delayedProcessing.toArray();
+			expect(dest).to.deep.equal([[1, 2], [3]]);
+		});
+
+		it("forms batch not exceeding maxBatchSize if a batch write is pending", async () => {
+			const source = Stream.from([
+				{
+					value: 1,
+				},
+				{
+					value: 2,
+					workTime: 1,
 				},
 				{
 					value: 3,
@@ -2167,43 +2258,81 @@ describe("Stream", () => {
 				},
 				{
 					value: 6,
+					wait: 2, // Stream waits 2 ms here so first batch can finish writing
+				},
+				{
+					value: 7,
+				},
+				{
+					value: 8,
 				},
 			]);
-			const batched = source.batch(3, 2);
-			const delayedProcessing = batched.map((batch) => {
-				const isDelay = !!batch.find(
-					({ sleep }) => sleep !== undefined
-				);
-				console.log(JSON.stringify({ batch: batch }));
-				console.log(JSON.stringify({ isDelay: isDelay }));
-				if (isDelay) {
-					const totalDelay = batch.reduce(
-						(acc, { sleep }) => acc + (sleep || 0),
-						0
-					);
-					console.log(JSON.stringify({ totalDelay: totalDelay }));
-					return (async () => {
-						await delay(totalDelay);
-						console.log(
-							`Resolving after delay ${JSON.stringify(
-								batch.map(({ value }) => value)
-							)}`
-						);
-
-						return batch.map(({ value }) => value);
-					})();
-				} else {
-					console.log(
-						`Resolving immediately ${JSON.stringify(
-							batch.map(({ value }) => value)
-						)}`
-					);
-					return batch.map(({ value }) => value);
-				}
-			});
+			const batched = pipeWithDelay(source).batch(3, { minBatchSize: 2 });
+			const delayedProcessing = batched.map(resolveBatchToAsyncValues);
 
 			const dest = await delayedProcessing.toArray();
-			expect(dest).to.deep.equal([[1, 2], [3, 4, 5], [6]]);
+			expect(dest).to.deep.equal([[1, 2], [3, 4, 5], [6, 7], [8]]);
+		});
+
+		it("writes any queued items after a duration from the last read if timeout is provided", async () => {
+			const source = Stream.from([
+				{
+					value: 1,
+					workTime: 3, // None of these work times should affect the result
+				},
+				{
+					value: 2,
+				},
+				{
+					value: 3,
+					workTime: 3,
+				},
+				{
+					value: 4,
+					wait: 1,
+				},
+				{
+					workTime: 2,
+					value: 5,
+				},
+				{
+					value: 6,
+					wait: 3,
+				},
+				{
+					value: 7,
+				},
+			]);
+			const batched = pipeWithDelay(source).batch(2, { flushTimeout: 2 });
+			const delayedProcessing = batched.map(resolveBatchToAsyncValues);
+
+			const dest = await delayedProcessing.toArray();
+			expect(dest).to.deep.equal([
+				[1, 2],
+				[3, 4], // Processed together because value 4 comes in after 1ms
+				[5], // Processed alone because value 6 comes in after 3ms, exceeding the timeout
+				[6, 7],
+			]);
+		});
+
+		it("ceases writing and flushes the queue on abort", async () => {
+			const source = Stream.from([
+				{
+					value: 1,
+				},
+				{
+					value: 2,
+					abort: true,
+				},
+				{
+					value: 3,
+				},
+			]);
+			const batched = pipeWithDelay(source).batch(2);
+			const delayedProcessing = batched.map(resolveBatchToAsyncValues);
+
+			const dest = await delayedProcessing.toArray();
+			expect(dest).to.deep.equal([[1, 2], [3, 4], [5], [6, 7]]);
 		});
 
 		it("waits for source stream to end", async () => {

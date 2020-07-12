@@ -335,17 +335,19 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 	 * regardless of any thresholds.
 	 *
 	 * @param maxBatchSize The maximum length of batch for the stream to emit.
-	 * @param minBatchSize? The minimum length of batch that the stream will try to emit if
+	 * @param options.minBatchSize? The minimum length of batch that the stream will try to emit if
 	 * no write is in progress. Defaults to `maxBatchSize`.
-	 * @param flushTimeout? The interval in milliseconds after which the stream will emit
+	 * @param options.flushTimeout? The interval in milliseconds after which the stream will emit
 	 * all source values, even if there are fewer than `minBatchSize` of them.
 	 * @return New readable stream emitting values from its source in batches.
 	 */
 	batch(
 		maxBatchSize: number,
-		minBatchSize?: number,
-		flushTimeout?: number
-	): ReadableStream<T[]>;
+		options?: {
+			minBatchSize?: number,
+			flushTimeout?: number
+		}
+	): ReadableStream<T[]>
 
 	/**
 	 * Reduce the stream into a single value by calling a reducer callback for
@@ -1081,16 +1083,18 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * regardless of any thresholds.
 	 *
 	 * @param maxBatchSize The maximum length of batch for the stream to emit.
-	 * @param minBatchSize? The minimum length of batch that the stream will try to emit if
+	 * @param options.minBatchSize? The minimum length of batch that the stream will try to emit if
 	 * no write is in progress. Defaults to `maxBatchSize`.
-	 * @param flushTimeout? The interval in milliseconds after which the stream will emit
+	 * @param options.flushTimeout? The interval in milliseconds after which the stream will emit
 	 * all source values, even if there are fewer than `minBatchSize` of them.
 	 * @return New readable stream emitting values from its source in batches.
 	 */
 	public batch(
 		maxBatchSize: number,
-		minBatchSize = maxBatchSize,
-		flushTimeout?: number
+		{
+			minBatchSize = maxBatchSize,
+			flushTimeout = undefined as undefined | number
+		} = {}
 	): ReadableStream<T[]> {
 		const output = new Stream<T[]>();
 		batch(this, output, maxBatchSize, minBatchSize, flushTimeout);
