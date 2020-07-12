@@ -13,6 +13,7 @@ import * as chai from "chai";
 chai.use(chaiAsPromised);
 
 import { expect } from "chai";
+import "source-map-support/register";
 
 import {
 	AlreadyHaveReaderError,
@@ -839,6 +840,7 @@ describe("Stream", () => {
 
 			d.resolve();
 			await settle([mres.promise]);
+			expect(writes[2].isFulfilled).to.equal(true);
 		});
 
 		it("waits for destination stream to end", async () => {
@@ -2068,7 +2070,7 @@ describe("Stream", () => {
 	}); // from()
 
 	describe("issue #31", (): void => {
-		it("should not result in unhandled rejections", (done) => {
+		it("should not result in unhandled rejections", (done: MochaDone): void => {
 			const result = new Stream();
 			const stream = new Stream();
 			stream.end(new Error("foo")).catch((error) => undefined);
@@ -2127,4 +2129,169 @@ describe("Stream", () => {
 			expect(streamResult).eventually.rejectedWith(endError);
 		});
 	});
+
+	describe("batch()", () => {
+		const batchResults: number[][] = [];
+		beforeEach(() => batchResults.splice(0));
+
+		it("batches values", async () => {
+			const batched = s.batch(2);
+			const toWrite = [1, 2, 3];
+			const writes = [
+				...toWrite.map((n) => track(s.write(n))),
+				track(s.end()),
+			];
+			readInto(batched, batchResults);
+			await s.result();
+			expect(batchResults).to.deep.equal([[1, 2], [3]]);
+			writes.forEach((write) => expect(write.isFulfilled).to.equal(true));
+		});
+
+		it("eagerly forms batch when provided with minBatchSize", async () => {
+			const source = Stream.from([
+				{
+					value: 1,
+				},
+				{
+					value: 2,
+					sleep: 1,
+				},
+				{
+					value: 3,
+				},
+				{
+					value: 4,
+				},
+				{
+					value: 5,
+				},
+				{
+					value: 6,
+				},
+			]);
+			const batched = source.batch(3, 2);
+			const delayedProcessing = batched.map((batch) => {
+				const isDelay = !!batch.find(
+					({ sleep }) => sleep !== undefined
+				);
+				console.log(JSON.stringify({ batch: batch }));
+				console.log(JSON.stringify({ isDelay: isDelay }));
+				if (isDelay) {
+					const totalDelay = batch.reduce(
+						(acc, { sleep }) => acc + (sleep || 0),
+						0
+					);
+					console.log(JSON.stringify({ totalDelay: totalDelay }));
+					return (async () => {
+						await delay(totalDelay);
+						console.log(
+							`Resolving after delay ${JSON.stringify(
+								batch.map(({ value }) => value)
+							)}`
+						);
+
+						return batch.map(({ value }) => value);
+					})();
+				} else {
+					console.log(
+						`Resolving immediately ${JSON.stringify(
+							batch.map(({ value }) => value)
+						)}`
+					);
+					return batch.map(({ value }) => value);
+				}
+			});
+
+			const dest = await delayedProcessing.toArray();
+			expect(dest).to.deep.equal([[1, 2], [3, 4, 5], [6]]);
+		});
+
+		it("waits for source stream to end", async () => {
+			const d = defer();
+			const slowEndingSource = s.transform<number>(
+				(readable, writable) => {
+					readable.forEach(
+						(v) => writable.write(v),
+						(error?: Error) => {
+							writable.end(error, readable.result());
+							return d.promise;
+						}
+					);
+				}
+			);
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
+
+			const batched = slowEndingSource.batch(1);
+			const mres = track(batched.result());
+			readInto(batched, batchResults);
+
+			await settle([writes[0].promise, writes[1].promise]);
+			await delay(1);
+			expect(batchResults).to.deep.equal([[1], [2]]);
+			expect(writes[0].isFulfilled).to.equal(true);
+			expect(writes[1].isFulfilled).to.equal(true);
+			expect(writes[2].isFulfilled).to.equal(false);
+			expect(mres.isFulfilled).to.equal(false);
+
+			d.resolve();
+			await settle([mres.promise]);
+			expect(writes[2].isFulfilled).to.equal(true);
+		});
+
+		it("waits for destination stream to end", async () => {
+			const d = defer();
+			const slowEnder: Transform<number[], number[]> = (
+				readable,
+				writable
+			) => {
+				readable.forEach(
+					(v) => writable.write(v),
+					(error?: Error) => {
+						writable.end(error, readable.result());
+						return d.promise;
+					}
+				);
+			};
+			const w1 = track(s.write(1));
+			const w2 = track(s.write(2));
+			const we = track(s.end());
+
+			const batched = s.batch(1);
+			const mres = track(batched.result());
+			const slowed = batched.transform(slowEnder);
+			const sres = track(slowed.result());
+			readInto(slowed, batchResults);
+
+			await delay(1);
+			expect(batchResults).to.deep.equal([[1], [2]]);
+			expect(w1.isFulfilled).to.equal(true);
+			expect(w2.isFulfilled).to.equal(true);
+			expect(we.isFulfilled).to.equal(false);
+			expect(mres.isFulfilled).to.equal(false);
+			expect(sres.isFulfilled).to.equal(false);
+
+			d.resolve();
+			await settle([mres.promise, sres.promise]);
+		});
+
+		it("aborts from source to sink", async () => {
+			const sink = s.batch(1).map(identity);
+			const ab = track(sink.aborted());
+			s.abort(abortError);
+			await settle([ab.promise]);
+			expect(ab.reason).to.equal(abortError);
+		});
+
+		it("aborts from sink to source", async () => {
+			const ab = track(s.aborted());
+			const sink = s.batch(1).map(identity);
+			sink.abort(abortError);
+			await settle([ab.promise]);
+			expect(ab.reason).to.equal(abortError);
+		});
+	}); // batch()
 });

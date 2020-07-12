@@ -1093,7 +1093,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		flushTimeout?: number
 	): ReadableStream<T[]> {
 		const output = new Stream<T[]>();
-		batch(this, output, minBatchSize, maxBatchSize, flushTimeout);
+		batch(this, output, maxBatchSize, minBatchSize, flushTimeout);
 		return output;
 	}
 

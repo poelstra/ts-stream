@@ -124,20 +124,34 @@ export function batch<T>(
 	readable.aborted().catch((err) => writable.abort(err));
 
 	let queue: T[] = [];
-	let writeBatchPromise: Promise<void> | undefined;
+	let writeBatchPromise = Promise.resolve();
 	let timer: NodeJS.Timer | undefined;
 
 	async function flush() {
+		if (timer) {
+			clearTimeout(timer);
+		}
+
+		console.log(`flush ${queue.length}`);
+		console.log(JSON.stringify({"queue": queue}));
 		if (queue.length) {
-			writeBatchPromise = writable.write(queue).then(
-				() => writeBatchPromise = undefined
-			);
+			const peeled = queue;
 			queue = [];
+
+			writeBatchPromise = writeBatchPromise.then(
+				() => writable.write(peeled)
+			);
+
+			return writeBatchPromise;
+		} else {
 			return writeBatchPromise;
 		}
 	}
 
 	function cleanup() {
+		console.log("cleanup");
+		console.log(JSON.stringify({"queue": queue}));
+		
 		if (timer) {
 			clearTimeout(timer);
 		}
@@ -149,13 +163,11 @@ export function batch<T>(
 			queue.push(v);
 
 			if (queue.length >= maxBatchSize) {
+				console.log(JSON.stringify({"queue.length >= maxBatchSize": queue.length >= maxBatchSize}))
 				flush();
 			} else if (queue.length >= minBatchSize) {
-				if (writeBatchPromise) {
-					writeBatchPromise.then(flush);
-				} else {
-					flush();
-				}
+				console.log(JSON.stringify({"queue.length >= minBatchSize": queue.length >= minBatchSize}))
+				writeBatchPromise.then(flush);
 			}
 
 			if (queue.length && flushTimeout !== undefined) {
