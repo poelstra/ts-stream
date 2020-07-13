@@ -136,12 +136,9 @@ export function batch<T>(
 
 	async function flush() {
 		if (timer) {
-			console.log("Clearing timer");
 			clearTimeout(timer);
 		}
 
-		console.log(`flush ${queue.length}`);
-		console.log(JSON.stringify({"queue": queue}));
 		if (queue.length) {
 			const peeled = queue;
 			queue = [];
@@ -157,11 +154,7 @@ export function batch<T>(
 	}
 
 	function cleanup() {
-		console.log("cleanup");
-		
 		if (timer) {
-			console.log("Clearing timeout on cleanup");
-			
 			clearTimeout(timer);
 		}
 		return flush();
@@ -170,7 +163,6 @@ export function batch<T>(
 	readable.forEach(
 		(v: T): void|Promise<void> => {
 			queue.push(v);
-			console.log(JSON.stringify({"write": v}))
 
 			if (queue.length >= maxBatchSize) {
 				flush();
@@ -179,10 +171,8 @@ export function batch<T>(
 			}
 
 			if (queue.length && flushTimeout !== undefined) {
-				console.log("Starting timeout");
 				timer = setTimeout(
 					() => {
-						console.log("Executing timeout");
 						flush();
 					},
 					flushTimeout
