@@ -2294,86 +2294,40 @@ describe("Stream", () => {
 			expect(dest).to.deep.equal([[1, 2], [3, 4, 5], [6, 7], [8]]);
 		});
 
-		function getMicroSecTime() {
-			var hrTime = process.hrtime();
-			return (hrTime[0] * 1000000000 + hrTime[1]) / 1000;
-		}
-
 		it("writes any queued items after a duration from the last read if timeout is provided", async () => {
-			const log = console.log;
-			try {
-				let successes = 0;
-				const queue: string[] = [];
-				let start = getMicroSecTime();
-				console.log = (str) =>
-					queue.push(
-						((getMicroSecTime() - start) / 1000).toFixed(3) +
-							": " +
-							str
-					);
-				const trials = 1000;
-				for (let i = 0; i < trials; i++) {
-					start = getMicroSecTime();
-					try {
-						const source = Stream.from([
-							{
-								value: 1,
-							},
-							{
-								value: 2,
-								wait: 10,
-							},
-							{
-								value: 3,
-							},
-							{
-								value: 4,
-								wait: 1,
-							},
-							{
-								workTime: 2,
-								value: 5,
-							},
-							{
-								value: 6,
-							},
-							{
-								value: 7,
-								wait: 10,
-							},
-						]);
-						const batched = pipeWithDelay(source).batch(2, {
-							flushTimeout: 5,
-						});
-						const delayedProcessing = resolveBatchToAsyncValues(
-							batched
-						);
+			const source = Stream.from([
+				{
+					value: 1,
+				},
+				{
+					value: 2,
+					wait: 10,
+				},
+				{
+					value: 3,
+				},
+				{
+					value: 4,
+					wait: 1,
+				},
+				{
+					workTime: 2,
+					value: 5,
+				},
+				{
+					value: 6,
+				},
+				{
+					value: 7,
+					wait: 10,
+				},
+			]);
+			const batched = pipeWithDelay(source).batch(2, { flushTimeout: 5 });
+			const delayedProcessing = resolveBatchToAsyncValues(batched);
 
-						const dest = await delayedProcessing;
-						expect(dest).to.deep.equal([
-							[1],
-							[2, 3],
-							[4, 5],
-							[6],
-							[7],
-						]);
-
-						successes++;
-						queue.splice(0);
-					} catch (e) {
-						log("---- FAIL ----");
-						queue.splice(0).forEach((val) => log(val));
-						console.error(e);
-					}
-				}
-
-				expect(successes).to.equal(trials);
-			} catch (e) {
-				throw e;
-			} finally {
-				console.log = log;
-			}
-		}).timeout(40000);
+			const dest = await delayedProcessing;
+			expect(dest).to.deep.equal([[1], [2, 3], [4, 5], [6], [7]]);
+		});
 
 		it("ceases writing on abort", async () => {
 			const source = new Stream<{ value: number; abort?: boolean }>();
