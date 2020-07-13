@@ -331,8 +331,8 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 	 * aren't held up indefinitely as they wait for enough elements to cross the `minBatchSize`
 	 * threshold.
 	 *
-	 * When the stream ends for any reason, all remaining elements in the queue are written,
-	 * regardless of any thresholds.
+	 * When the stream ends, all remaining elements in the queue are written, regardless of any
+	 * thresholds.
 	 *
 	 * @param maxBatchSize The maximum length of batch for the stream to emit.
 	 * @param options.minBatchSize? The minimum length of batch that the stream will try to emit if
@@ -1079,8 +1079,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	 * aren't held up indefinitely as they wait for enough elements to cross the `minBatchSize`
 	 * threshold.
 	 *
-	 * When the stream ends for any reason, all remaining elements in the queue are written,
-	 * regardless of any thresholds.
+	 * When the stream ends, all remaining elements in the queue are written, regardless of any
+	 * thresholds.
 	 *
 	 * @param maxBatchSize The maximum length of batch for the stream to emit.
 	 * @param options.minBatchSize? The minimum length of batch that the stream will try to emit if
@@ -1094,7 +1094,7 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		{
 			minBatchSize = maxBatchSize,
 			flushTimeout = undefined as undefined | number
-		} = {}
+		} = {},
 	): ReadableStream<T[]> {
 		const output = new Stream<T[]>();
 		batch(this, output, maxBatchSize, minBatchSize, flushTimeout);

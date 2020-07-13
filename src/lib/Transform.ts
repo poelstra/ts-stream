@@ -120,8 +120,15 @@ export function batch<T>(
 	minBatchSize = maxBatchSize,
 	flushTimeout: number | undefined
 ): void {
-	writable.aborted().catch((err) => readable.abort(err));
-	readable.aborted().catch((err) => writable.abort(err));
+	let isAborted = false;
+
+	writable.aborted().catch((err: Error) => {
+		readable.abort(err);
+		isAborted = true;
+	});
+	readable.aborted().catch((err) => {
+		writable.abort(err);
+	});
 
 	let queue: T[] = [];
 	let writeBatchPromise = Promise.resolve();
@@ -139,7 +146,7 @@ export function batch<T>(
 			queue = [];
 
 			writeBatchPromise = writeBatchPromise.then(
-				() => writable.write(peeled)
+				() => isAborted ? Promise.resolve() : writable.write(peeled)
 			);
 
 			return writeBatchPromise;
