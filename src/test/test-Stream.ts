@@ -13,7 +13,6 @@ import * as chai from "chai";
 chai.use(chaiAsPromised);
 
 import { expect } from "chai";
-import "source-map-support/register";
 
 import {
 	AlreadyHaveReaderError,
