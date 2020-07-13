@@ -24,13 +24,3 @@ export function filterer<T>(
 		filter(readable, writable, filterFn);
 	};
 }
-
-export function batcher<In>(
-	maxBatchSize: number,
-	minBatchSize = maxBatchSize,
-	flushTimeout?: number
-): Transform<In, In[]> {
-	return (readable: Readable<In>, writable: Writable<In[]>): void => {
-		batch(readable, writable, minBatchSize, maxBatchSize, flushTimeout);
-	};
-}
