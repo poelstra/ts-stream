@@ -2202,24 +2202,11 @@ describe("Stream", () => {
 						(acc, { workTime }) => acc + (workTime || 0),
 						0
 					);
-					console.log(JSON.stringify({ totalDelay: totalDelay }));
 					return (async () => {
 						await delay(totalDelay);
-						console.log(
-							`Resolving after delay ${JSON.stringify(
-								batch.map(({ value }) => value)
-							)}`
-						);
-
 						result.push(batch.map(({ value }) => value));
 					})();
 				} else {
-					console.log(
-						`Resolving immediately ${JSON.stringify(
-							batch.map(({ value }) => value)
-						)}`
-					);
-
 					result.push(batch.map(({ value }) => value));
 				}
 			});
@@ -2311,8 +2298,8 @@ describe("Stream", () => {
 					wait: 1,
 				},
 				{
-					workTime: 2,
 					value: 5,
+					workTime: 2,
 				},
 				{
 					value: 6,
@@ -2336,8 +2323,8 @@ describe("Stream", () => {
 					value: 1,
 				},
 				{
-					value: 2,
 					abort: true,
+					value: 2,
 				},
 				{
 					value: 3,
@@ -2348,7 +2335,7 @@ describe("Stream", () => {
 
 			let isAborted = false;
 
-			source.aborted().catch((e) => {
+			source.aborted().catch(() => {
 				isAborted = true;
 			});
 

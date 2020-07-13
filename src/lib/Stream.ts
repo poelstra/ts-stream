@@ -347,7 +347,7 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 			minBatchSize?: number,
 			flushTimeout?: number
 		}
-	): ReadableStream<T[]>
+	): ReadableStream<T[]>;
 
 	/**
 	 * Reduce the stream into a single value by calling a reducer callback for
@@ -1093,8 +1093,8 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		maxBatchSize: number,
 		{
 			minBatchSize = maxBatchSize,
-			flushTimeout = undefined as undefined | number
-		} = {},
+			flushTimeout = undefined as undefined | number,
+		} = {}
 	): ReadableStream<T[]> {
 		const output = new Stream<T[]>();
 		batch(this, output, maxBatchSize, minBatchSize, flushTimeout);
