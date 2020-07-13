@@ -2165,7 +2165,8 @@ describe("Stream", () => {
 						return writableStream.write(item);
 					}
 				})
-				.then(() => writableStream.end());
+				.then(() => writableStream.end())
+				.catch(() => writableStream.end());
 
 			return writableStream;
 		}
@@ -2368,7 +2369,6 @@ describe("Stream", () => {
 
 			source.aborted().catch((e) => {
 				isAborted = true;
-				source.end();
 			});
 
 			const batched = pipeWithDelay(source).batch(2);
