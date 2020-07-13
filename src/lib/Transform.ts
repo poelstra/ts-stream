@@ -143,8 +143,8 @@ export function batch<T>(
 			const peeled = queue;
 			queue = [];
 
-			writeBatchPromise = writeBatchPromise.then(
-				() => isAborted ? Promise.resolve() : writable.write(peeled)
+			writeBatchPromise = writeBatchPromise.then(() =>
+				isAborted ? Promise.resolve() : writable.write(peeled)
 			);
 
 			return writeBatchPromise;
@@ -161,7 +161,7 @@ export function batch<T>(
 	}
 
 	readable.forEach(
-		(v: T): void|Promise<void> => {
+		(v: T): void | Promise<void> => {
 			queue.push(v);
 
 			if (queue.length >= maxBatchSize) {
@@ -171,17 +171,13 @@ export function batch<T>(
 			}
 
 			if (queue.length && flushTimeout !== undefined) {
-				timer = setTimeout(
-					() => {
-						flush();
-					},
-					flushTimeout
-				);
+				timer = setTimeout(() => {
+					flush();
+				}, flushTimeout);
 			}
 		},
-		composeEnders(
-			cleanup,
-			(error?: Error) => writable.end(error, readable.result())
+		composeEnders(cleanup, (error?: Error) =>
+			writable.end(error, readable.result())
 		),
 		cleanup
 	);

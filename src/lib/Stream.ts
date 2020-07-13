@@ -344,8 +344,8 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 	batch(
 		maxBatchSize: number,
 		options?: {
-			minBatchSize?: number,
-			flushTimeout?: number
+			minBatchSize?: number;
+			flushTimeout?: number;
 		}
 	): ReadableStream<T[]>;
 
