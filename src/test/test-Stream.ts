@@ -2069,7 +2069,7 @@ describe("Stream", () => {
 	}); // from()
 
 	describe("issue #31", (): void => {
-		it("should not result in unhandled rejections", (done: Mocha.Done): void => {
+		it("should not result in unhandled rejections", (done: Mocha.Done) => {
 			const result = new Stream();
 			const stream = new Stream();
 			stream.end(new Error("foo")).catch((error) => undefined);
