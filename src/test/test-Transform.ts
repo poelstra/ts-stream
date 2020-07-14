@@ -9,6 +9,7 @@ import { useFakeTimers } from "sinon";
 describe("Transform", () => {
 	let s: Stream<number>;
 	let abortError: Error;
+	let boomError: Error;
 	let sinonClock: ReturnType<typeof useFakeTimers>;
 
 	before(() => {
@@ -18,6 +19,7 @@ describe("Transform", () => {
 	beforeEach(() => {
 		s = new Stream<number>();
 		abortError = new Error("Test stream explicitly aborted");
+		boomError = new Error("Test error");
 	});
 
 	after(() => {
@@ -50,7 +52,7 @@ describe("Transform", () => {
 				workTime?: number;
 				wait?: number;
 				abort?: boolean;
-				throwError?: true;
+				throwError?: boolean;
 			}>
 		) {
 			const stream = readableStream.map(async (item) => {
@@ -71,7 +73,7 @@ describe("Transform", () => {
 					workTime?: number;
 					wait?: number;
 					abort?: boolean;
-					throwError?: true;
+					throwError?: boolean;
 				}[]
 			>
 		) {
@@ -80,6 +82,14 @@ describe("Transform", () => {
 					const isDelay = !!batch.find(
 						({ workTime }) => workTime !== undefined
 					);
+
+					const isError = !!batch.find(
+						({ throwError }) => !!throwError
+					);
+
+					if (isError) {
+						throw boomError;
+					}
 
 					const isAbort = !!batch.find(({ abort }) => !!abort);
 
@@ -146,7 +156,7 @@ describe("Transform", () => {
 			})
 		);
 
-		it("forms batch if write not pending when provided with minBatchSize", async () => {
+		it("with `minBatchSize`, forms batch if write not pending", async () => {
 			const source = Stream.from([
 				{
 					value: 1,
@@ -165,7 +175,42 @@ describe("Transform", () => {
 		});
 
 		it(
-			"forms batch not exceeding maxBatchSize if a batch write is pending",
+			"applies backpressure to a `maxBatchSize` write from a `minBatchSize` write",
+			clockwise(async () => {
+				const batched = s.transform(batcher(2, { minBatchSize: 1 }));
+				const toWrite = [1, 2, 3];
+				const writes = [
+					...toWrite.map((n) => track(s.write(n))),
+					track(s.end()),
+				];
+
+				const resolvers: (() => void)[] = [];
+				batched.forEach(async (value) => {
+					const deferred = defer();
+					resolvers.push(deferred.resolve);
+					await deferred.promise;
+
+					batchResults.push(value);
+				});
+				await delay(1);
+				expect(batchResults).to.deep.equal([]);
+				expect(writes[0].isFulfilled).to.equal(true); // Commenced silently
+				expect(writes[1].isFulfilled).to.equal(true); // Added to the queue
+				expect(writes[2].isFulfilled).to.equal(false); // Triggers a batch write which can't begin yet
+				expect(resolvers[1]).to.equal(undefined);
+				resolvers[0]();
+				await delay(1);
+				expect(writes[2].isFulfilled).to.equal(false); // Batch write still can't finish, but...
+				expect(resolvers[1]).not.to.equal(undefined); // It's started!
+				resolvers[1]();
+				await delay(1);
+				expect(writes[2].isFulfilled).to.equal(true); // Now the batch write is finished...
+				expect(writes[3].isFulfilled).to.equal(true); // And the stream can end
+			})
+		);
+
+		it(
+			"forms batch not exceeding `maxBatchSize` if a batch write is pending",
 			clockwise(async () => {
 				const source = Stream.from([
 					{
@@ -214,6 +259,57 @@ describe("Transform", () => {
 			})
 		);
 
+		it("bounces error", async () => {
+			const source = Stream.from([
+				{
+					value: 1,
+				},
+				{
+					value: 2,
+				},
+				{
+					value: 3,
+					throwError: true,
+				},
+			]);
+
+			const batched = pipeWithDelay(source).transform(batcher(3));
+
+			try {
+				await resolveBatchToAsyncValues(batched);
+				expect(true).to.equal(false);
+			} catch (e) {
+				expect(e).to.equal(boomError);
+			}
+		});
+
+		it("bounces error from `minBatchSize` batch", async () => {
+			const source = Stream.from([
+				{
+					value: 1,
+					throwError: true,
+				},
+				{
+					value: 2,
+					wait: 1,
+				},
+				{
+					value: 3,
+				},
+			]);
+
+			const batched = pipeWithDelay(source).transform(
+				batcher(2, { minBatchSize: 1 })
+			);
+
+			try {
+				await resolveBatchToAsyncValues(batched);
+				expect(true).to.equal(false);
+			} catch (e) {
+				expect(e).to.equal(boomError);
+			}
+		});
+
 		it(
 			"writes any queued items after a duration from the last read if timeout is provided",
 			clockwise(async () => {
@@ -237,18 +333,14 @@ describe("Transform", () => {
 					batcher(2, { flushTimeout: 2 })
 				);
 
-				try {
-					const dest = await resolveBatchToAsyncValues(batched);
-					expect(dest).to.deep.equal([
-						[1], //    Processed alone because timeout fires before 2 comes in
-						[2, 3], // Processed together because they arrived within the same window
-						//         and form a batch (3 arrives after 1ms delay which is within
-						//         2ms timeout)
-						[4], //    Processed alone because stream ends
-					]);
-				} catch (e) {
-					/** Expected */
-				}
+				const dest = await resolveBatchToAsyncValues(batched);
+				expect(dest).to.deep.equal([
+					[1], //    Processed alone because timeout fires before 2 comes in
+					[2, 3], // Processed together because they arrived within the same window
+					//         and form a batch (3 arrives after 1ms delay which is within
+					//         2ms timeout)
+					[4], //    Processed alone because stream ends
+				]);
 			})
 		);
 
