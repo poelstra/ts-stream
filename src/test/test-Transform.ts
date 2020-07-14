@@ -311,6 +311,33 @@ describe("Transform", () => {
 		});
 
 		it(
+			"bounces error from `flushTimeout` batch",
+			clockwise(async () => {
+				const source = Stream.from([
+					{
+						throwError: true,
+						value: 1,
+					},
+					{
+						value: 2,
+						wait: 2,
+					},
+				]);
+
+				const batched = pipeWithDelay(source).transform(
+					batcher(4, { flushTimeout: 1 })
+				);
+
+				try {
+					await resolveBatchToAsyncValues(batched);
+					expect(true).to.equal(false);
+				} catch (e) {
+					expect(e).to.equal(boomError);
+				}
+			})
+		);
+
+		it(
 			"writes any queued items after a duration from the last read if timeout is provided",
 			clockwise(async () => {
 				const source = Stream.from([
