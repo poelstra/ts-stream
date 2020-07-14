@@ -146,19 +146,6 @@ describe("Transform", () => {
 			})
 		);
 
-		it("batches values", async () => {
-			const batched = s.transform(batcher(2));
-			const toWrite = [1, 2, 3];
-			const writes = [
-				...toWrite.map((n) => track(s.write(n))),
-				track(s.end()),
-			];
-			readInto(batched, batchResults);
-			await s.result();
-			expect(batchResults).to.deep.equal([[1, 2], [3]]);
-			writes.forEach((write) => expect(write.isFulfilled).to.equal(true));
-		});
-
 		it("forms batch if write not pending when provided with minBatchSize", async () => {
 			const source = Stream.from([
 				{
