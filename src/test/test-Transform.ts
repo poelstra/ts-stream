@@ -135,16 +135,6 @@ describe("Transform", () => {
 			expect(dest).to.deep.equal([[1, 2], [3]]);
 		});
 
-		it("should time out after 500 ms", async function () {
-			var timedOut = false;
-			const delayPromise = delay(500).then(() => (timedOut = true));
-
-			expect(timedOut).to.equal(false);
-			await sinonClock.runToLastAsync();
-			await delayPromise;
-			expect(timedOut).to.equal(true);
-		});
-
 		it(
 			"forms batch not exceeding maxBatchSize if a batch write is pending",
 			clockwise(async () => {
