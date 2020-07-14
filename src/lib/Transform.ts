@@ -135,8 +135,9 @@ export function batch<T>(
 	let timer: NodeJS.Timer | undefined;
 
 	async function flush() {
-		if (timer) {
+		if (timer !== undefined) {
 			clearTimeout(timer);
+			timer = undefined;
 		}
 
 		if (queue.length) {
@@ -151,13 +152,6 @@ export function batch<T>(
 		} else {
 			return writeBatchPromise;
 		}
-	}
-
-	function cleanup() {
-		if (timer) {
-			clearTimeout(timer);
-		}
-		return flush();
 	}
 
 	readable.forEach(
@@ -176,10 +170,10 @@ export function batch<T>(
 				}, flushTimeout);
 			}
 		},
-		composeEnders(cleanup, (error?: Error) =>
+		composeEnders(flush, (error?: Error) =>
 			writable.end(error, readable.result())
 		),
-		cleanup
+		flush
 	);
 }
 
