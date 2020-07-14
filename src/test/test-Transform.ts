@@ -75,34 +75,76 @@ describe("Transform", () => {
 				}[]
 			>
 		) {
-			const result: number[][] = [];
-
-			await readableStream.forEach(async (batch) => {
-				const isDelay = !!batch.find(
-					({ workTime }) => workTime !== undefined
-				);
-
-				const isAbort = !!batch.find(({ abort }) => !!abort);
-
-				if (isAbort) {
-					readableStream.abort(abortError);
-				}
-
-				if (isDelay) {
-					const totalDelay = batch.reduce(
-						(acc, { workTime }) => acc + (workTime || 0),
-						0
+			return readableStream
+				.map(async (batch) => {
+					const isDelay = !!batch.find(
+						({ workTime }) => workTime !== undefined
 					);
 
-					await delay(totalDelay);
-					result.push(batch.map(({ value }) => value));
-				} else {
-					result.push(batch.map(({ value }) => value));
-				}
-			});
+					const isAbort = !!batch.find(({ abort }) => !!abort);
 
-			return result;
+					if (isAbort) {
+						readableStream.abort(abortError);
+					}
+
+					if (isDelay) {
+						const totalDelay = batch.reduce(
+							(acc, { workTime }) => acc + (workTime || 0),
+							0
+						);
+
+						await delay(totalDelay);
+					}
+
+					return batch.map(({ value }) => value);
+				})
+				.toArray();
 		}
+
+		it("batches values", async () => {
+			const batched = s.transform(batcher(2));
+			const toWrite = [1, 2, 3];
+			const writes = [
+				...toWrite.map((n) => track(s.write(n))),
+				track(s.end()),
+			];
+			readInto(batched, batchResults);
+			await s.result();
+			expect(batchResults).to.deep.equal([[1, 2], [3]]);
+			writes.forEach((write) => expect(write.isFulfilled).to.equal(true));
+		});
+
+		it(
+			"applies backpressure",
+			clockwise(async () => {
+				const batched = s.transform(batcher(2));
+				const toWrite = [1, 2, 3];
+				const writes = [
+					...toWrite.map((n) => track(s.write(n))),
+					track(s.end()),
+				];
+
+				const resolvers: (() => void)[] = [];
+				batched.forEach(async (value) => {
+					const deferred = defer();
+					resolvers.push(deferred.resolve);
+					await deferred.promise;
+
+					batchResults.push(value);
+				});
+				await delay(1);
+				expect(batchResults).to.deep.equal([]);
+				resolvers[0]();
+				await settle([writes[0].promise, writes[1].promise]);
+				expect(batchResults).to.deep.equal([[1, 2]]);
+				expect(writes[2].isPending).to.equal(true);
+				await delay(1);
+				resolvers[1]();
+				await settle([writes[3].promise]);
+				expect(writes[2].isFulfilled).to.equal(true);
+				expect(writes[3].isFulfilled).to.equal(true);
+			})
+		);
 
 		it("batches values", async () => {
 			const batched = s.transform(batcher(2));
@@ -154,13 +196,14 @@ describe("Transform", () => {
 					},
 					{
 						value: 5,
+						workTime: 2,
 					},
 					{
 						value: 6,
-						wait: 2, // Stream waits 2 ms here so first batch can finish writing
 					},
 					{
 						value: 7,
+						wait: 3,
 					},
 					{
 						value: 8,
@@ -174,7 +217,13 @@ describe("Transform", () => {
 				const destAsync = resolveBatchToAsyncValues(batched);
 				const dest = await destAsync;
 
-				expect(dest).to.deep.equal([[1, 2], [3, 4, 5], [6, 7], [8]]);
+				expect(dest).to.deep.equal([
+					[1, 2], //    Min batch size (this will take 1ms to write)
+					[3, 4, 5], // Max batch size streams in while first batch is writing (this will take 2ms to write)
+					[6, 7], //    Min batch size (7 arrives after a 3ms delay so the previous batch is processed and the new
+					//            batch is completed)
+					[8], //       Processed alone when stream ends
+				]);
 			})
 		);
 
@@ -187,34 +236,29 @@ describe("Transform", () => {
 					},
 					{
 						value: 2,
-						wait: 10,
+						wait: 3,
 					},
 					{
 						value: 3,
-					},
-					{
-						value: 4,
 						wait: 1,
 					},
 					{
-						value: 5,
-						workTime: 2,
-					},
-					{
-						value: 6,
-					},
-					{
-						value: 7,
-						wait: 10,
+						value: 4,
 					},
 				]);
 				const batched = pipeWithDelay(source).transform(
-					batcher(2, { flushTimeout: 5 })
+					batcher(2, { flushTimeout: 2 })
 				);
 
 				try {
 					const dest = await resolveBatchToAsyncValues(batched);
-					expect(dest).to.deep.equal([[1], [2, 3], [4, 5], [6], [7]]);
+					expect(dest).to.deep.equal([
+						[1], //    Processed alone because timeout fires before 2 comes in
+						[2, 3], // Processed together because they arrived within the same window
+						//         and form a batch (3 arrives after 1ms delay which is within
+						//         2ms timeout)
+						[4], //    Processed alone because stream ends
+					]);
 				} catch (e) {
 					/** Expected */
 				}
