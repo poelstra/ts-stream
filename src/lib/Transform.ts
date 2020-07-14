@@ -6,8 +6,13 @@
  * License: MIT
  */
 
-import { Readable, Stream, Writable } from "./Stream";
-import { track, TrackedVoidPromise } from "./util";
+import {
+	Readable,
+	Stream,
+	Writable,
+	ReadableStream,
+	WritableStream,
+} from "./Stream";
 
 export type Transform<In, Out> = (
 	readable: Readable<In>,
@@ -134,6 +139,13 @@ export function batch<T>(
 	let writeBatchPromise = Promise.resolve();
 	let timer: NodeJS.Timer | undefined;
 
+	async function queueNextWrite(peeled: T[]) {
+		await writeBatchPromise;
+		if (!isAborted) {
+			await writable.write(peeled);
+		}
+	}
+
 	async function flush() {
 		if (timer !== undefined) {
 			clearTimeout(timer);
@@ -144,30 +156,35 @@ export function batch<T>(
 			const peeled = queue;
 			queue = [];
 
-			writeBatchPromise = writeBatchPromise.then(() =>
-				isAborted ? Promise.resolve() : writable.write(peeled)
-			);
+			writeBatchPromise = queueNextWrite(peeled);
+		}
 
-			return writeBatchPromise;
-		} else {
-			return writeBatchPromise;
+		await writeBatchPromise;
+	}
+
+	async function queueOutOfFlowFlush() {
+		try {
+			await writeBatchPromise;
+			await flush();
+		} catch (e) {
+			readable.abort(e);
 		}
 	}
 
 	readable.forEach(
-		(v: T): void | Promise<void> => {
+		async (v: T): Promise<void> => {
 			queue.push(v);
 
 			if (queue.length >= maxBatchSize) {
-				flush();
+				// backpressure
+				await flush();
 			} else if (queue.length >= minBatchSize) {
-				writeBatchPromise.then(flush);
+				// no backpressure (will abort stream if it fails)
+				queueOutOfFlowFlush();
 			}
 
 			if (queue.length && flushTimeout !== undefined) {
-				timer = setTimeout(() => {
-					flush();
-				}, flushTimeout);
+				timer = setTimeout(queueOutOfFlowFlush, flushTimeout);
 			}
 		},
 		composeEnders(flush, (error?: Error) =>
