@@ -328,18 +328,21 @@ describe("Transform", () => {
 					{
 						value: 4,
 					},
+					{
+						value: 5,
+					},
 				]);
 				const batched = pipeWithDelay(source).transform(
-					batcher(2, { flushTimeout: 2 })
+					batcher(3, { flushTimeout: 2 })
 				);
 
 				const dest = await resolveBatchToAsyncValues(batched);
 				expect(dest).to.deep.equal([
 					[1], //    Processed alone because timeout fires before 2 comes in
-					[2, 3], // Processed together because they arrived within the same window
+					[2, 3, 4], // Processed together because they arrived within the same window
 					//         and form a batch (3 arrives after 1ms delay which is within
 					//         2ms timeout)
-					[4], //    Processed alone because stream ends
+					[5], //    Processed alone because stream ends
 				]);
 			})
 		);
