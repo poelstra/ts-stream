@@ -25,6 +25,11 @@ export function filterer<T>(
 	};
 }
 
+export type BatcherOptions = {
+	minBatchSize?: number;
+	flushTimeout?: number;
+};
+
 /**
  * Transformer to pipe arrays of elements in regular batches.
  *
@@ -58,10 +63,7 @@ export function filterer<T>(
  */
 export function batcher<T>(
 	maxBatchSize: number,
-	{
-		minBatchSize = maxBatchSize,
-		flushTimeout = undefined as undefined | number,
-	} = {}
+	{ minBatchSize = maxBatchSize, flushTimeout }: BatcherOptions = {}
 ): Transform<T, T[]> {
 	return (readable: Readable<T>, writable: Writable<T[]>): void => {
 		batch(readable, writable, maxBatchSize, minBatchSize, flushTimeout);
