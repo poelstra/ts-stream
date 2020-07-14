@@ -243,6 +243,7 @@ describe("Transform", () => {
 					[1, 2],
 					[3, 4],
 				]);
+				expect(batched.isEndingOrEnded()).to.equal(false);
 				await batched.result();
 			})
 		);
