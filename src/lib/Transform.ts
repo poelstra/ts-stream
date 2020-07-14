@@ -13,6 +13,7 @@ import {
 	ReadableStream,
 	WritableStream,
 } from "./Stream";
+import { track, TrackedVoidPromise, defer } from "./util";
 
 export type Transform<In, Out> = (
 	readable: Readable<In>,
@@ -162,12 +163,22 @@ export function batch<T>(
 		await writeBatchPromise;
 	}
 
+	let outOfFlowFlushPromise: TrackedVoidPromise | undefined;
 	async function queueOutOfFlowFlush() {
-		try {
-			await writeBatchPromise;
-			await flush();
-		} catch (e) {
-			readable.abort(e);
+		if (!outOfFlowFlushPromise || !outOfFlowFlushPromise.isPending) {
+			const deferred = defer();
+			outOfFlowFlushPromise = track(deferred.promise);
+
+			try {
+				await writeBatchPromise;
+				await flush();
+				deferred.resolve();
+				outOfFlowFlushPromise = undefined;
+			} catch (e) {
+				readable.abort(e);
+				deferred.resolve();
+				outOfFlowFlushPromise = undefined;
+			}
 		}
 	}
 
