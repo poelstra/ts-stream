@@ -11,7 +11,7 @@
 import * as assert from "assert";
 
 import BaseError from "./BaseError";
-import { batch, filter, map, Transform } from "./Transform";
+import { filter, map, Transform } from "./Transform";
 import {
 	defer,
 	Deferred,
@@ -308,46 +308,6 @@ export interface ReadableStream<T> extends Readable<T>, CommonStream<T> {
 		ender?: (error?: Error) => void | PromiseLike<void>,
 		aborter?: (error: Error) => void
 	): ReadableStream<T>;
-
-	/**
-	 * Transform a stream into a readable stream that emits arrays of elements in
-	 * regular batches.
-	 *
-	 * The stream keeps an internal queue. When the queue reaches `maxBatchSize`, all its
-	 * contents are written to the stream.
-	 *
-	 * If `minBatchSize` is set, the queue will try to write its contents to the stream
-	 * when the queue reaches `minBatchSize`, but only if there is no previous asynchronous
-	 * write in progress.
-	 *
-	 * In other words, `minBatchSize` declares the smallest batch that successive transforms
-	 * consider "worthwhile" to handle, while `maxBatchSize` declares the largest batch that
-	 * successive transforms can comfortably handle in a single operation (think writes to a
-	 * database or calls to an external API).
-	 *
-	 * If `flushTimeout` is set, the queue will always begin writing its contents within the
-	 * specified time period (in milliseconds). In the case of sources that provide sporadic
-	 * input over a long interval, this can be used to ensure that short bursts of input
-	 * aren't held up indefinitely as they wait for enough elements to cross the `minBatchSize`
-	 * threshold.
-	 *
-	 * When the stream ends, all remaining elements in the queue are written, regardless of any
-	 * thresholds.
-	 *
-	 * @param maxBatchSize The maximum length of batch for the stream to emit.
-	 * @param options.minBatchSize? The minimum length of batch that the stream will try to emit if
-	 * no write is in progress. Defaults to `maxBatchSize`.
-	 * @param options.flushTimeout? The interval in milliseconds after which the stream will emit
-	 * all source values, even if there are fewer than `minBatchSize` of them.
-	 * @return New readable stream emitting values from its source in batches.
-	 */
-	batch(
-		maxBatchSize: number,
-		options?: {
-			minBatchSize?: number;
-			flushTimeout?: number;
-		}
-	): ReadableStream<T[]>;
 
 	/**
 	 * Reduce the stream into a single value by calling a reducer callback for
@@ -1054,50 +1014,6 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 	): ReadableStream<T> {
 		const output = new Stream<T>();
 		filter(this, output, filterer, ender, aborter);
-		return output;
-	}
-
-	/**
-	 * Transform a stream into a readable stream that emits arrays of elements in
-	 * regular batches.
-	 *
-	 * The stream keeps an internal queue. When the queue reaches `maxBatchSize`, all its
-	 * contents are written to the stream.
-	 *
-	 * If `minBatchSize` is set, the queue will try to write its contents to the stream
-	 * when the queue reaches `minBatchSize`, but only if there is no previous asynchronous
-	 * write in progress.
-	 *
-	 * In other words, `minBatchSize` declares the smallest batch that successive transforms
-	 * consider "worthwhile" to handle, while `maxBatchSize` declares the largest batch that
-	 * successive transforms can comfortably handle in a single operation (think writes to a
-	 * database or calls to an external API).
-	 *
-	 * If `flushTimeout` is set, the queue will always begin writing its contents within the
-	 * specified time period (in milliseconds). In the case of sources that provide sporadic
-	 * input over a long interval, this can be used to ensure that short bursts of input
-	 * aren't held up indefinitely as they wait for enough elements to cross the `minBatchSize`
-	 * threshold.
-	 *
-	 * When the stream ends, all remaining elements in the queue are written, regardless of any
-	 * thresholds.
-	 *
-	 * @param maxBatchSize The maximum length of batch for the stream to emit.
-	 * @param options.minBatchSize? The minimum length of batch that the stream will try to emit if
-	 * no write is in progress. Defaults to `maxBatchSize`.
-	 * @param options.flushTimeout? The interval in milliseconds after which the stream will emit
-	 * all source values, even if there are fewer than `minBatchSize` of them.
-	 * @return New readable stream emitting values from its source in batches.
-	 */
-	public batch(
-		maxBatchSize: number,
-		{
-			minBatchSize = maxBatchSize,
-			flushTimeout = undefined as undefined | number,
-		} = {}
-	): ReadableStream<T[]> {
-		const output = new Stream<T[]>();
-		batch(this, output, maxBatchSize, minBatchSize, flushTimeout);
 		return output;
 	}
 
