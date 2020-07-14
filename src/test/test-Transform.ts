@@ -210,6 +210,44 @@ describe("Transform", () => {
 		);
 
 		it(
+			"Can write two `minBatchSize` batches back-to-back without needing to be triggered by write() or end()",
+			clockwise(async () => {
+				async function doWrite() {
+					s.write(1);
+					s.write(2);
+					s.write(3);
+					s.write(4);
+					await delay(10);
+					s.end();
+				}
+
+				const batched = s.transform(batcher(5, { minBatchSize: 2 }));
+				const resolvers: (() => void)[] = [];
+				batched.forEach(async (batch) => {
+					const deferred = defer();
+					resolvers.push(deferred.resolve);
+					await deferred.promise;
+					batchResults.push(batch);
+				});
+
+				doWrite();
+				await delay(1);
+				expect(resolvers.length).to.equal(1);
+				resolvers[0]();
+				await delay(1);
+				expect(batchResults).to.deep.equal([[1, 2]]);
+				expect(resolvers.length).to.equal(2);
+				resolvers[1]();
+				await delay(1);
+				expect(batchResults).to.deep.equal([
+					[1, 2],
+					[3, 4],
+				]);
+				await batched.result();
+			})
+		);
+
+		it(
 			"forms batch not exceeding `maxBatchSize` if a batch write is pending",
 			clockwise(async () => {
 				const source = Stream.from([
