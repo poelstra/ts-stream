@@ -137,15 +137,8 @@ export function batch<T>(
 	});
 
 	let queue: T[] = [];
-	let writeBatchPromise = Promise.resolve();
 	let timer: NodeJS.Timer | undefined;
-
-	async function queueNextWrite(peeled: T[]) {
-		await writeBatchPromise;
-		if (!isAborted) {
-			await writable.write(peeled);
-		}
-	}
+	let pendingWrite = false;
 
 	async function flush() {
 		if (timer !== undefined) {
@@ -157,28 +150,21 @@ export function batch<T>(
 			const peeled = queue;
 			queue = [];
 
-			writeBatchPromise = queueNextWrite(peeled);
+			if (!isAborted) {
+				await writable.write(peeled);
+			}
 		}
-
-		await writeBatchPromise;
 	}
 
-	let outOfFlowFlushPromise: TrackedVoidPromise | undefined;
-	async function queueOutOfFlowFlush() {
-		if (!outOfFlowFlushPromise || !outOfFlowFlushPromise.isPending) {
-			const deferred = defer();
-			outOfFlowFlushPromise = track(deferred.promise);
-
-			try {
-				await writeBatchPromise;
+	async function earlyFlush(): Promise<void> {
+		try {
+			do {
+				pendingWrite = true;
 				await flush();
-				deferred.resolve();
-				outOfFlowFlushPromise = undefined;
-			} catch (e) {
-				readable.abort(e);
-				deferred.resolve();
-				outOfFlowFlushPromise = undefined;
-			}
+				pendingWrite = false; // doesn't matter if not reset on error
+			} while (queue.length >= minBatchSize);
+		} catch (err) {
+			readable.abort(err);
 		}
 	}
 
@@ -189,16 +175,16 @@ export function batch<T>(
 			if (queue.length >= maxBatchSize) {
 				// backpressure
 				await flush();
-			} else if (queue.length >= minBatchSize) {
-				// no backpressure (will abort stream if it fails)
-				queueOutOfFlowFlush();
+			} else if (queue.length >= minBatchSize && !pendingWrite) {
+				// no backpressure yet (until new queue fills to maxBatchSize)
+				earlyFlush();
 			}
 
-			if (queue.length && flushTimeout !== undefined) {
+			if (queue.length && flushTimeout !== undefined && !pendingWrite) {
 				if (timer !== undefined) {
 					clearTimeout(timer);
 				}
-				timer = setTimeout(queueOutOfFlowFlush, flushTimeout);
+				timer = setTimeout(earlyFlush, flushTimeout);
 			}
 		},
 		async (error?: Error) => {
