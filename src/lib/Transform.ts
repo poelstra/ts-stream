@@ -190,9 +190,14 @@ export function batch<T>(
 				timer = setTimeout(queueOutOfFlowFlush, flushTimeout);
 			}
 		},
-		composeEnders(flush, (error?: Error) =>
-			writable.end(error, readable.result())
-		),
+		async (error?: Error) => {
+			try {
+				await flush();
+				await writable.end(error, readable.result());
+			} catch (e) {
+				await writable.end(e, readable.result());
+			}
+		},
 		flush
 	);
 }
