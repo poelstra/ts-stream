@@ -16,7 +16,6 @@ import { expect } from "chai";
 
 import {
 	AlreadyHaveReaderError,
-	ReadableStream,
 	Stream,
 	Transform,
 	WriteAfterEndError,
