@@ -184,6 +184,9 @@ export function batch<T>(
 			}
 
 			if (queue.length && flushTimeout !== undefined) {
+				if (timer !== undefined) {
+					clearTimeout(timer);
+				}
 				timer = setTimeout(queueOutOfFlowFlush, flushTimeout);
 			}
 		},
