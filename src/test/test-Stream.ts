@@ -1084,6 +1084,21 @@ describe("Stream", () => {
 			expect(writes[2].isFulfilled).to.equal(true);
 		});
 
+		it("filters values async", async () => {
+			const filtered = s.filter(async (n) => n % 2 === 0);
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
+			readInto(filtered, results);
+			await s.result();
+			expect(results).to.deep.equal([2]);
+			expect(writes[0].isFulfilled).to.equal(true);
+			expect(writes[1].isFulfilled).to.equal(true);
+			expect(writes[2].isFulfilled).to.equal(true);
+		});
+
 		it("bounces thrown error", async () => {
 			const filtered = s.filter((n) => {
 				if (n === 1) {

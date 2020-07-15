@@ -3,7 +3,14 @@ import * as chai from "chai";
 chai.use(chaiAsPromised);
 const { expect } = chai;
 
-import { ReadableStream, Stream, Transform, batcher } from "../lib/index";
+import {
+	ReadableStream,
+	Stream,
+	Transform,
+	batcher,
+	mapper,
+	compose,
+} from "../lib/index";
 
 import "./mocha-init";
 import { defer, delay, settle, track, readInto, identity } from "./util";
@@ -27,6 +34,20 @@ describe("Transform", () => {
 
 	after(() => {
 		sinonClock.restore();
+	});
+
+	describe("compose()", () => {
+		it("composes stream transformations", async () => {
+			const source = Stream.from([1, 2, 3, 4]);
+			const mapperA = mapper((val: number) => val % 2 === 0);
+			const mapperB = mapper((val: boolean) => (val ? "Even" : "Odd"));
+			const composedTransformA = compose(mapperA, mapperB);
+			// @ts-expect-error
+			const composedTransformB = compose(mapperB, mapperA);
+
+			const dest = await source.transform(composedTransformA).toArray();
+			expect(dest).to.deep.equal(["Odd", "Even", "Odd", "Even"]);
+		});
 	});
 
 	describe("batch()", () => {
