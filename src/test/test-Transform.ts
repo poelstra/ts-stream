@@ -1,4 +1,7 @@
-import { expect } from "chai";
+import * as chaiAsPromised from "chai-as-promised";
+import * as chai from "chai";
+chai.use(chaiAsPromised);
+const { expect } = chai;
 
 import { ReadableStream, Stream, Transform, batcher } from "../lib/index";
 
@@ -299,80 +302,85 @@ describe("Transform", () => {
 		);
 
 		it("bounces error", async () => {
-			const source = Stream.from([
-				{
-					value: 1,
-				},
-				{
-					value: 2,
-				},
-				{
-					value: 3,
-					throwError: true,
-				},
-			]);
-
-			const batched = pipeWithDelay(source).transform(batcher(3));
-
-			try {
-				await resolveBatchToAsyncValues(batched);
-				expect(true).to.equal(false);
-			} catch (e) {
-				expect(e).to.equal(boomError);
+			async function doWrites() {
+				await s.write(1);
+				await s.write(2);
+				await s.end();
 			}
+
+			let isAborted = false;
+			s.aborted().catch(() => (isAborted = true));
+
+			const batched = s.transform(batcher(1));
+
+			await expect(
+				Promise.all([
+					batched
+						.forEach(async () => {
+							throw boomError;
+						})
+						.catch(() => Promise.reject("Should not throw")),
+					doWrites(),
+				])
+			).eventually.rejectedWith(boomError);
+
+			expect(isAborted).to.equal(false);
 		});
 
 		it("bounces error from `minBatchSize` batch", async () => {
-			const source = Stream.from([
-				{
-					value: 1,
-					throwError: true,
-				},
-				{
-					value: 2,
-					wait: 1,
-				},
-				{
-					value: 3,
-				},
-			]);
-
-			const batched = pipeWithDelay(source).transform(
-				batcher(2, { minBatchSize: 1 })
-			);
-
-			try {
-				await resolveBatchToAsyncValues(batched);
-				expect(true).to.equal(false);
-			} catch (e) {
-				expect(e).to.equal(boomError);
+			async function doWrites() {
+				await s.write(1);
+				await s.write(2);
+				await s.end();
+				await s.result();
 			}
+
+			let isAborted = false;
+			s.aborted().catch(() => (isAborted = true));
+
+			const batched = s.transform(batcher(2, { minBatchSize: 1 }));
+
+			await expect(
+				Promise.all([
+					batched
+						.forEach(async () => {
+							throw boomError;
+						})
+						.catch(() => Promise.reject("Should not throw")),
+					doWrites(),
+				])
+			).eventually.rejectedWith(boomError);
+
+			expect(isAborted).to.equal(false);
 		});
 
 		it(
 			"bounces error from `flushTimeout` batch",
 			clockwise(async () => {
-				const source = Stream.from([
-					{
-						throwError: true,
-						value: 1,
-					},
-					{
-						value: 2,
-						wait: 2,
-					},
-				]);
-
-				const batched = pipeWithDelay(source).transform(
-					batcher(4, { flushTimeout: 1 })
-				);
-
-				try {
-					await resolveBatchToAsyncValues(batched);
-					expect(true).to.equal(false);
-				} catch (e) {
-					expect(e).to.equal(boomError);
+				async function doWrites() {
+					await s.write(1);
+					await delay(2);
+					await s.write(2);
+					await s.end();
 				}
+
+				let isAborted = false;
+				s.aborted().catch(() => (isAborted = true));
+
+				const batched = s.transform(batcher(2, { flushTimeout: 1 }));
+
+				await expect(
+					Promise.all([
+						batched
+							.forEach(async () => {
+								throw boomError;
+							})
+							.catch(() => Promise.reject("Should not throw")),
+						doWrites(),
+					])
+				).eventually.rejectedWith(boomError);
+
+				expect(isAborted).to.equal(false);
 			})
 		);
 

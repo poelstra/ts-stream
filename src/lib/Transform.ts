@@ -156,20 +156,37 @@ export function batch<T>(
 		}
 	}
 
+	let earlyError: Error | undefined;
 	async function earlyFlush(): Promise<void> {
-		try {
-			do {
-				pendingWrite = true;
-				await flush();
-				pendingWrite = false; // doesn't matter if not reset on error
-			} while (queue.length >= minBatchSize);
-		} catch (err) {
-			readable.abort(err);
+		if (earlyError === undefined) {
+			try {
+				do {
+					pendingWrite = true;
+					await flush();
+					pendingWrite = false; // doesn't matter if not reset on error
+				} while (queue.length >= minBatchSize);
+			} catch (err) {
+				earlyError = err;
+			}
+		}
+	}
+
+	function consumeEarlyEndError() {
+		const result = earlyError;
+		earlyError = undefined;
+		return result;
+	}
+
+	function throwIfThrowable(e: Error | undefined) {
+		if (e) {
+			throw e;
 		}
 	}
 
 	readable.forEach(
 		async (v: T): Promise<void> => {
+			throwIfThrowable(consumeEarlyEndError());
+
 			queue.push(v);
 
 			if (queue.length >= maxBatchSize) {
@@ -188,12 +205,17 @@ export function batch<T>(
 			}
 		},
 		async (error?: Error) => {
+			let toThrow = consumeEarlyEndError() || error;
+
 			try {
 				await flush();
-				await writable.end(error, readable.result());
 			} catch (e) {
-				await writable.end(e, readable.result());
+				toThrow = e;
 			}
+
+			await writable.end(toThrow, readable.result());
+
+			throwIfThrowable(toThrow);
 		},
 		flush
 	);
