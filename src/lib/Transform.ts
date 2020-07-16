@@ -229,11 +229,9 @@ export function batch<T>(
 				flushError = e;
 			}
 
-			await writable.end(
-				error || earlyFlushError || flushError,
-				readable.result()
-			);
-			throwIfThrowable(earlyFlushError || flushError);
+			await writable.end(error, readable.result());
+			throwIfThrowable(earlyFlushError);
+			throwIfThrowable(flushError);
 		},
 		flush
 	);
