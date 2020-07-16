@@ -137,9 +137,12 @@ export interface TrackedVoidPromise extends TrackedPromise<void> {
 }
 
 /**
- * Allows to track the status of a promise. Note that this attaches a handler
- * to the promise so no unhandled rejection can take place after this (after
- * all you're tracking the error)
+ * Creates an object to track the status of a promise.
+ *
+ * Note that this attaches a handler to the promise so no unhandled
+ * rejection can take place after this. However, the new chained
+ * promise on the tracker object can still throw an unhandled
+ * rejection.
  *
  * @param p promise to track
  */
