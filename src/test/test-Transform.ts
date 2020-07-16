@@ -328,7 +328,7 @@ describe("Transform", () => {
 			| "second element"
 			| "both elements";
 		function conditionalThrow(testCase: FlushErrorTestCase) {
-			return async function (batch: number[]) {
+			return async (batch: number[]) => {
 				expect(batch.length).to.equal(1);
 				const [item] = batch;
 
@@ -350,7 +350,7 @@ describe("Transform", () => {
 				await s.end();
 			}
 
-			for (let testCase of [
+			for (const testCase of [
 				"first element",
 				"second element",
 				"both elements",
