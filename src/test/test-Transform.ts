@@ -15,6 +15,7 @@ import {
 import "./mocha-init";
 import { defer, delay, settle, track, readInto, identity } from "./util";
 import { useFakeTimers } from "sinon";
+import { runInThisContext } from "vm";
 
 describe("Transform", () => {
 	let s: Stream<number>;
@@ -322,88 +323,112 @@ describe("Transform", () => {
 			})
 		);
 
-		it("bounces error", async () => {
-			async function doWrites() {
-				await s.write(1);
-				await s.write(2);
-				await s.end();
-			}
+		type FlushErrorTestCase =
+			| "first element"
+			| "second element"
+			| "both elements";
+		function conditionalThrow(testCase: FlushErrorTestCase) {
+			return async function (batch: number[]) {
+				expect(batch.length).to.equal(1);
+				const [item] = batch;
 
-			let isAborted = false;
-			s.aborted().catch(() => (isAborted = true));
-
-			const batched = s.transform(batcher(1));
-
-			await expect(
-				Promise.all([
-					batched
-						.forEach(async () => {
-							throw boomError;
-						})
-						.catch(() => Promise.reject("Should not throw")),
-					doWrites(),
-				])
-			).eventually.rejectedWith(boomError);
-
-			expect(isAborted).to.equal(false);
-		});
-
-		it("bounces error from `minBatchSize` batch", async () => {
-			async function doWrites() {
-				await s.write(1);
-				await s.write(2);
-				await s.end();
-				await s.result();
-			}
-
-			let isAborted = false;
-			s.aborted().catch(() => (isAborted = true));
-
-			const batched = s.transform(batcher(2, { minBatchSize: 1 }));
-
-			await expect(
-				Promise.all([
-					batched
-						.forEach(async () => {
-							throw boomError;
-						})
-						.catch(() => Promise.reject("Should not throw")),
-					doWrites(),
-				])
-			).eventually.rejectedWith(boomError);
-
-			expect(isAborted).to.equal(false);
-		});
-
-		it(
-			"bounces error from `flushTimeout` batch",
-			clockwise(async () => {
-				async function doWrites() {
-					await s.write(1);
-					await delay(2);
-					await s.write(2);
-					await s.end();
+				if (testCase === "both elements") {
+					throw boomError;
+				} else if (testCase === "first element" && item === 1) {
+					throw boomError;
+				} else if (testCase === "second element" && item === 2) {
+					throw boomError;
 				}
+			};
+		}
 
-				let isAborted = false;
-				s.aborted().catch(() => (isAborted = true));
+		describe("error cases", () => {
+			async function doWrites() {
+				await s.write(1);
+				await delay(2);
+				await s.write(2);
+				await s.end();
+			}
 
-				const batched = s.transform(batcher(2, { flushTimeout: 1 }));
+			for (let testCase of [
+				"first element",
+				"second element",
+				"both elements",
+			] as FlushErrorTestCase[]) {
+				it(
+					`bounces error - ${testCase}`,
+					clockwise(async () => {
+						let isAborted = false;
+						s.aborted().catch(() => (isAborted = true));
 
-				await expect(
-					Promise.all([
-						batched
-							.forEach(async () => {
-								throw boomError;
-							})
-							.catch(() => Promise.reject("Should not throw")),
-						doWrites(),
-					])
-				).eventually.rejectedWith(boomError);
+						const batched = s.transform(batcher(1));
 
-				expect(isAborted).to.equal(false);
-			})
-		);
+						await expect(
+							Promise.all([
+								batched
+									.forEach(conditionalThrow(testCase))
+									.catch(() =>
+										Promise.reject("Should not throw")
+									),
+								doWrites(),
+							])
+						).eventually.rejectedWith(boomError);
+
+						expect(isAborted).to.equal(false);
+					})
+				);
+
+				it(
+					`bounces error from \`minBatchSize\` batch - ${testCase}`,
+					clockwise(async () => {
+						let isAborted = false;
+						s.aborted().catch(() => (isAborted = true));
+
+						const batched = s.transform(
+							batcher(2, { minBatchSize: 1 })
+						);
+
+						await expect(
+							Promise.all([
+								batched
+									.forEach(conditionalThrow(testCase))
+									.catch(() =>
+										Promise.reject("Should not throw")
+									),
+								doWrites(),
+							])
+						).eventually.rejectedWith(boomError);
+
+						expect(isAborted).to.equal(false);
+					})
+				);
+
+				it(
+					`bounces error from \`flushTimeout\` batch - ${testCase}`,
+					clockwise(async () => {
+						let isAborted = false;
+						s.aborted().catch(() => (isAborted = true));
+
+						const batched = s.transform(
+							batcher(2, { flushTimeout: 1 })
+						);
+
+						await expect(
+							Promise.all([
+								batched
+									.forEach(conditionalThrow(testCase))
+									.catch(() =>
+										Promise.reject("Should not throw")
+									),
+								doWrites(),
+							])
+						).eventually.rejectedWith(boomError);
+
+						expect(isAborted).to.equal(false);
+					})
+				);
+			}
+		});
 
 		it(
 			"writes any queued items after a duration from the last read if timeout is provided",

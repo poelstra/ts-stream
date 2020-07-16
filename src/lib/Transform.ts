@@ -6,14 +6,8 @@
  * License: MIT
  */
 
-import {
-	Readable,
-	Stream,
-	Writable,
-	ReadableStream,
-	WritableStream,
-} from "./Stream";
-import { track, TrackedVoidPromise, defer } from "./util";
+import { Readable, Stream, Writable } from "./Stream";
+import assert = require("assert");
 
 export type Transform<In, Out> = (
 	readable: Readable<In>,
@@ -141,6 +135,8 @@ export function batch<T>(
 	let pendingWrite = false;
 
 	async function flush() {
+		console.log("flush");
+
 		if (timer !== undefined) {
 			clearTimeout(timer);
 			timer = undefined;
@@ -151,6 +147,8 @@ export function batch<T>(
 			queue = [];
 
 			if (!isAborted) {
+				console.log("writable.write");
+
 				await writable.write(peeled);
 			}
 		}
@@ -158,14 +156,19 @@ export function batch<T>(
 
 	let earlyError: Error | undefined;
 	async function earlyFlush(): Promise<void> {
-		if (earlyError === undefined) {
+		console.log(JSON.stringify({ pendingWrite: pendingWrite }));
+
+		if (!pendingWrite && earlyError === undefined) {
 			try {
 				do {
 					pendingWrite = true;
 					await flush();
-					pendingWrite = false; // doesn't matter if not reset on error
+					pendingWrite = false;
 				} while (queue.length >= minBatchSize);
 			} catch (err) {
+				pendingWrite = false;
+				console.log(`${earlyError} = ${err}`);
+
 				earlyError = err;
 			}
 		}
@@ -185,37 +188,67 @@ export function batch<T>(
 
 	readable.forEach(
 		async (v: T): Promise<void> => {
-			throwIfThrowable(consumeEarlyEndError());
-
 			queue.push(v);
+			let flushFailureError: Error | undefined;
 
 			if (queue.length >= maxBatchSize) {
 				// backpressure
-				await flush();
+				try {
+					await flush();
+				} catch (e) {
+					flushFailureError = e;
+				}
 			} else if (queue.length >= minBatchSize && !pendingWrite) {
 				// no backpressure yet (until new queue fills to maxBatchSize)
 				earlyFlush();
-			}
-
-			if (queue.length && flushTimeout !== undefined && !pendingWrite) {
+			} else if (
+				queue.length &&
+				flushTimeout !== undefined &&
+				!pendingWrite
+			) {
 				if (timer !== undefined) {
 					clearTimeout(timer);
 				}
 				timer = setTimeout(earlyFlush, flushTimeout);
 			}
+
+			throwIfThrowable(consumeEarlyEndError());
+			throwIfThrowable(flushFailureError);
 		},
 		async (error?: Error) => {
-			let toThrow = consumeEarlyEndError() || error;
+			// collect early error
+			// try to flush
+			// end writable with error argument (if above did not fail)
+			// or with the failure (if above did fail, error argument taking precedence if present)
+			// if above did fail, throw that failure
 
+			const earlyError = consumeEarlyEndError();
+			let flushError: Error | undefined;
 			try {
 				await flush();
 			} catch (e) {
-				toThrow = e;
+				flushError = e;
 			}
 
-			await writable.end(toThrow, readable.result());
+			console.log("writable.end");
 
-			throwIfThrowable(toThrow);
+			await writable.end(
+				error || earlyError || flushError,
+				readable.result()
+			);
+			throwIfThrowable(earlyError || flushError);
+
+			//----
+			// console.log(JSON.stringify({ "pendingWrite.end": pendingWrite }));
+			// console.log(JSON.stringify({ "queue.end": queue }));
+			// let toThrow = error;
+			// try {
+			// 	await flush();
+			// } catch (e) {
+			// 	toThrow = e;
+			// }
+			// await writable.end(toThrow, readable.result());
+			// throwIfThrowable(consumeEarlyEndError());
 		},
 		flush
 	);
