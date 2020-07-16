@@ -217,9 +217,11 @@ export function batch<T>(
 			throwIfThrowable(flushFailureError);
 		},
 		async (error?: Error) => {
+			clearFlushTimeout();
 			let flushError: Error | undefined;
 
-			let earlyFlushError: Error | undefined = await settleEarlyFlush();
+			const earlyFlushError = await settleEarlyFlush();
+
 			try {
 				await flush();
 			} catch (e) {
