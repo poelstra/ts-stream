@@ -7,8 +7,7 @@
  */
 
 import { Readable, Stream, Writable } from "./Stream";
-import assert = require("assert");
-import { Deferred, defer, TrackedVoidPromise, track, delay } from "./util";
+import { TrackedVoidPromise, track, swallowErrors } from "./util";
 
 export type Transform<In, Out> = (
 	readable: Readable<In>,
@@ -140,6 +139,7 @@ export function batch<T>(
 	async function earlyFlush(): Promise<void> {
 		while (queue.length >= minBatchSize && queue.length < maxBatchSize) {
 			pendingWrite = track(flush());
+			swallowErrors(pendingWrite.promise);
 			await pendingWrite.promise;
 		}
 
@@ -165,6 +165,7 @@ export function batch<T>(
 					// this will pressure the downstream reader. We could prevent
 					// this by tracking the promise of a normal flush.
 					pendingWrite = track(flush());
+					swallowErrors(pendingWrite.promise);
 				}
 			}, flushTimeout);
 		}
@@ -209,7 +210,7 @@ export function batch<T>(
 				}
 			} else if (!pendingWrite) {
 				// no backpressure yet (until new queue fills to maxBatchSize)
-				earlyFlush();
+				swallowErrors(earlyFlush());
 			}
 
 			throwIfThrowable(earlyFlushError);
