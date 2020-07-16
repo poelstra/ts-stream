@@ -8,6 +8,7 @@
 
 import { Readable, Stream, Writable } from "./Stream";
 import assert = require("assert");
+import { Deferred, defer, TrackedVoidPromise, track } from "./util";
 
 export type Transform<In, Out> = (
 	readable: Readable<In>,
@@ -132,10 +133,16 @@ export function batch<T>(
 
 	let queue: T[] = [];
 	let timer: NodeJS.Timer | undefined;
-	let pendingWrite = false;
+	let pendingWrite: TrackedVoidPromise | undefined;
 
 	async function flush() {
 		console.log("flush");
+		try {
+			await pendingWrite?.promise;
+		} catch (e) {
+			// Must wait for pending write to finish but we cannot handle
+			// the promise rejection here, so ignore it
+		}
 
 		if (timer !== undefined) {
 			clearTimeout(timer);
@@ -154,30 +161,27 @@ export function batch<T>(
 		}
 	}
 
-	let earlyError: Error | undefined;
 	async function earlyFlush(): Promise<void> {
 		console.log(JSON.stringify({ pendingWrite: pendingWrite }));
 
-		if (!pendingWrite && earlyError === undefined) {
-			try {
-				do {
-					pendingWrite = true;
-					await flush();
-					pendingWrite = false;
-				} while (queue.length >= minBatchSize);
-			} catch (err) {
-				pendingWrite = false;
-				console.log(`${earlyError} = ${err}`);
+		if (!pendingWrite) {
+			do {
+				pendingWrite = track(flush());
+				await pendingWrite.promise;
+			} while (queue.length >= minBatchSize);
 
-				earlyError = err;
-			}
+			// If the above throws, the rejected promise will remain in `pendingWrite`
+			// until it is 'consumed'
+			pendingWrite = undefined;
 		}
 	}
 
 	function consumeEarlyEndError() {
-		const result = earlyError;
-		earlyError = undefined;
-		return result;
+		if (pendingWrite?.isRejected) {
+			const reason = pendingWrite.reason;
+			pendingWrite = undefined;
+			return reason;
+		}
 	}
 
 	function throwIfThrowable(e: Error | undefined) {
@@ -192,18 +196,18 @@ export function batch<T>(
 			let flushFailureError: Error | undefined;
 
 			if (queue.length >= maxBatchSize) {
-				// backpressure
 				try {
+					// backpressure
 					await flush();
 				} catch (e) {
 					flushFailureError = e;
 				}
-			} else if (queue.length >= minBatchSize && !pendingWrite) {
+			} else if (queue.length >= minBatchSize) {
 				// no backpressure yet (until new queue fills to maxBatchSize)
 				earlyFlush();
 			} else if (
-				queue.length &&
 				flushTimeout !== undefined &&
+				queue.length &&
 				!pendingWrite
 			) {
 				if (timer !== undefined) {
@@ -216,19 +220,15 @@ export function batch<T>(
 			throwIfThrowable(flushFailureError);
 		},
 		async (error?: Error) => {
-			// collect early error
-			// try to flush
-			// end writable with error argument (if above did not fail)
-			// or with the failure (if above did fail, error argument taking precedence if present)
-			// if above did fail, throw that failure
-
-			const earlyError = consumeEarlyEndError();
 			let flushError: Error | undefined;
+
 			try {
 				await flush();
 			} catch (e) {
 				flushError = e;
 			}
+
+			const earlyError = consumeEarlyEndError();
 
 			console.log("writable.end");
 
@@ -237,18 +237,6 @@ export function batch<T>(
 				readable.result()
 			);
 			throwIfThrowable(earlyError || flushError);
-
-			//----
-			// console.log(JSON.stringify({ "pendingWrite.end": pendingWrite }));
-			// console.log(JSON.stringify({ "queue.end": queue }));
-			// let toThrow = error;
-			// try {
-			// 	await flush();
-			// } catch (e) {
-			// 	toThrow = e;
-			// }
-			// await writable.end(toThrow, readable.result());
-			// throwIfThrowable(consumeEarlyEndError());
 		},
 		flush
 	);
