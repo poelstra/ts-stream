@@ -138,7 +138,7 @@ export function batch<T>(
 	}
 
 	async function earlyFlush(): Promise<void> {
-		while (queue.length >= minBatchSize) {
+		while (queue.length >= minBatchSize && queue.length < maxBatchSize) {
 			pendingWrite = track(flush());
 			await pendingWrite.promise;
 		}
