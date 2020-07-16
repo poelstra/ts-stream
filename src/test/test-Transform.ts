@@ -424,8 +424,8 @@ describe("Transform", () => {
 							const ops = [
 								() => s.write(1),
 								() => delay(2),
-								() => s.write(2),
 								() => s.write(3),
+								() => s.write(2),
 								() => s.end(),
 							];
 
