@@ -15,7 +15,6 @@ import {
 import "./mocha-init";
 import { defer, delay, settle, track, readInto, identity } from "./util";
 import { useFakeTimers } from "sinon";
-import { runInThisContext } from "vm";
 
 describe("Transform", () => {
 	let s: Stream<number>;
@@ -344,10 +343,13 @@ describe("Transform", () => {
 
 		describe("error cases", () => {
 			async function doWrites() {
-				await s.write(1);
-				await delay(2);
-				await s.write(2);
-				await s.end();
+				try {
+					await s.write(1);
+					await delay(2);
+					await s.write(2);
+				} finally {
+					await s.end();
+				}
 			}
 
 			for (const testCase of [
@@ -363,16 +365,10 @@ describe("Transform", () => {
 
 						const batched = s.transform(batcher(1));
 
-						await expect(
-							Promise.all([
-								batched
-									.forEach(conditionalThrow(testCase))
-									.catch(() =>
-										Promise.reject("Should not throw")
-									),
-								doWrites(),
-							])
-						).eventually.rejectedWith(boomError);
+						await Promise.all([
+							batched.forEach(conditionalThrow(testCase)),
+							expect(doWrites()).rejectedWith(boomError),
+						]);
 
 						expect(isAborted).to.equal(false);
 					})
@@ -388,16 +384,10 @@ describe("Transform", () => {
 							batcher(2, { minBatchSize: 1 })
 						);
 
-						await expect(
-							Promise.all([
-								batched
-									.forEach(conditionalThrow(testCase))
-									.catch(() =>
-										Promise.reject("Should not throw")
-									),
-								doWrites(),
-							])
-						).eventually.rejectedWith(boomError);
+						await Promise.all([
+							batched.forEach(conditionalThrow(testCase)),
+							expect(doWrites()).rejectedWith(boomError),
+						]);
 
 						expect(isAborted).to.equal(false);
 					})
@@ -413,16 +403,10 @@ describe("Transform", () => {
 							batcher(2, { flushTimeout: 1 })
 						);
 
-						await expect(
-							Promise.all([
-								batched
-									.forEach(conditionalThrow(testCase))
-									.catch(() =>
-										Promise.reject("Should not throw")
-									),
-								doWrites(),
-							])
-						).eventually.rejectedWith(boomError);
+						await Promise.all([
+							batched.forEach(conditionalThrow(testCase)),
+							expect(doWrites()).rejectedWith(boomError),
+						]);
 
 						expect(isAborted).to.equal(false);
 					})
