@@ -126,6 +126,7 @@ export function batch<T>(
 
 	let queue: T[] = [];
 	let pendingWrite: TrackedVoidPromise | undefined;
+	let timeout: NodeJS.Timeout | undefined;
 
 	async function flush() {
 		if (queue.length) {
@@ -142,17 +143,31 @@ export function batch<T>(
 			await pendingWrite.promise;
 		}
 
-		if (typeof flushTimeout === "number") {
-			await delay(flushTimeout);
-			if (!pendingWrite && queue.length > 0) {
-				pendingWrite = track(flush());
-				await pendingWrite.promise;
-			}
-		}
-
 		// Won't be reached if the above throws, leaving the error to be handled
 		// by forEach() or end()
 		pendingWrite = undefined;
+	}
+
+	function clearFlushTimeout() {
+		if (timeout !== undefined) {
+			clearTimeout(timeout);
+			timeout = undefined;
+		}
+	}
+
+	function startFlushTimeout() {
+		if (typeof flushTimeout === "number") {
+			clearFlushTimeout();
+
+			timeout = setTimeout(() => {
+				if (!pendingWrite && queue.length > 0) {
+					// NOTE If a flush() operation is in progress when this fires,
+					// this will pressure the downstream reader. We could prevent
+					// this by tracking the promise of a normal flush.
+					pendingWrite = track(flush());
+				}
+			}, flushTimeout);
+		}
 	}
 
 	function consumeEarlyFlushError() {
@@ -179,6 +194,7 @@ export function batch<T>(
 
 	readable.forEach(
 		async (v: T): Promise<void> => {
+			startFlushTimeout();
 			queue.push(v);
 			let flushFailureError: Error | undefined;
 			let earlyFlushError: Error | undefined;
@@ -196,7 +212,8 @@ export function batch<T>(
 				earlyFlush();
 			}
 
-			throwIfThrowable(earlyFlushError || consumeEarlyFlushError());
+			throwIfThrowable(earlyFlushError);
+			throwIfThrowable(consumeEarlyFlushError()); // Catch the error early if possible
 			throwIfThrowable(flushFailureError);
 		},
 		async (error?: Error) => {
