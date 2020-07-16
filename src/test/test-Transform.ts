@@ -328,7 +328,6 @@ describe("Transform", () => {
 			| "both elements";
 		function conditionalThrow(testCase: FlushErrorTestCase) {
 			return async (batch: number[]) => {
-				expect(batch.length).to.equal(1);
 				const [item] = batch;
 
 				if (testCase === "both elements") {
@@ -402,6 +401,46 @@ describe("Transform", () => {
 						const batched = s.transform(
 							batcher(2, { flushTimeout: 1 })
 						);
+
+						await Promise.all([
+							batched.forEach(conditionalThrow(testCase)),
+							expect(doWrites()).rejectedWith(boomError),
+						]);
+
+						expect(isAborted).to.equal(false);
+					})
+				);
+
+				it(
+					`bounces error from stream end batch - ${testCase}`,
+					clockwise(async () => {
+						let isAborted = false;
+						s.aborted().catch(() => (isAborted = true));
+
+						const batched = s.transform(batcher(2));
+
+						async function doWrites() {
+							let firstError: Error | undefined;
+							const ops = [
+								() => s.write(1),
+								() => delay(2),
+								() => s.write(2),
+								() => s.write(3),
+								() => s.end(),
+							];
+
+							for (const op of ops) {
+								try {
+									await op();
+								} catch (e) {
+									firstError = firstError || e;
+								}
+							}
+
+							if (firstError) {
+								throw firstError;
+							}
+						}
 
 						await Promise.all([
 							batched.forEach(conditionalThrow(testCase)),

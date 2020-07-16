@@ -7,7 +7,7 @@
  */
 
 import { Readable, Stream, Writable } from "./Stream";
-import { TrackedVoidPromise, track, swallowErrors } from "./util";
+import { TrackedVoidPromise, track, swallowErrors, noop } from "./util";
 
 export type Transform<In, Out> = (
 	readable: Readable<In>,
@@ -229,7 +229,7 @@ export function batch<T>(
 				flushError = e;
 			}
 
-			await writable.end(error, readable.result());
+			await writable.end(error, readable.result().catch(noop));
 			throwIfThrowable(earlyFlushError);
 			throwIfThrowable(flushError);
 		},
