@@ -137,10 +137,10 @@ export function batch<T>(
 	}
 
 	async function earlyFlush(): Promise<void> {
-		do {
+		while (queue.length >= minBatchSize) {
 			pendingWrite = track(flush());
 			await pendingWrite.promise;
-		} while (queue.length >= minBatchSize);
+		}
 
 		if (typeof flushTimeout === "number") {
 			await delay(flushTimeout);
@@ -191,12 +191,12 @@ export function batch<T>(
 				} catch (e) {
 					flushFailureError = e;
 				}
-			} else if (queue.length >= minBatchSize && !pendingWrite) {
+			} else if (!pendingWrite) {
 				// no backpressure yet (until new queue fills to maxBatchSize)
 				earlyFlush();
 			}
 
-			throwIfThrowable(consumeEarlyFlushError());
+			throwIfThrowable(earlyFlushError || consumeEarlyFlushError());
 			throwIfThrowable(flushFailureError);
 		},
 		async (error?: Error) => {
