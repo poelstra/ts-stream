@@ -8,7 +8,7 @@
 
 import { Readable, Stream, Writable } from "./Stream";
 import assert = require("assert");
-import { Deferred, defer, TrackedVoidPromise, track } from "./util";
+import { Deferred, defer, TrackedVoidPromise, track, delay } from "./util";
 
 export type Transform<In, Out> = (
 	readable: Readable<In>,
@@ -121,66 +121,53 @@ export function batch<T>(
 	minBatchSize = maxBatchSize,
 	flushTimeout: number | undefined
 ): void {
-	let isAborted = false;
-
-	writable.aborted().catch((err: Error) => {
-		readable.abort(err);
-		isAborted = true;
-	});
-	readable.aborted().catch((err) => {
-		writable.abort(err);
-	});
+	writable.aborted().catch((err: Error) => readable.abort(err));
+	readable.aborted().catch((err) => writable.abort(err));
 
 	let queue: T[] = [];
-	let timer: NodeJS.Timer | undefined;
 	let pendingWrite: TrackedVoidPromise | undefined;
 
 	async function flush() {
-		console.log("flush");
-		try {
-			await pendingWrite?.promise;
-		} catch (e) {
-			// Must wait for pending write to finish but we cannot handle
-			// the promise rejection here, so ignore it
-		}
-
-		if (timer !== undefined) {
-			clearTimeout(timer);
-			timer = undefined;
-		}
-
 		if (queue.length) {
 			const peeled = queue;
 			queue = [];
 
-			if (!isAborted) {
-				console.log("writable.write");
-
-				await writable.write(peeled);
-			}
+			await writable.write(peeled);
 		}
 	}
 
 	async function earlyFlush(): Promise<void> {
-		console.log(JSON.stringify({ pendingWrite: pendingWrite }));
+		do {
+			pendingWrite = track(flush());
+			await pendingWrite.promise;
+		} while (queue.length >= minBatchSize);
 
-		if (!pendingWrite) {
-			do {
+		if (typeof flushTimeout === "number") {
+			await delay(flushTimeout);
+			if (!pendingWrite && queue.length > 0) {
 				pendingWrite = track(flush());
 				await pendingWrite.promise;
-			} while (queue.length >= minBatchSize);
+			}
+		}
 
-			// If the above throws, the rejected promise will remain in `pendingWrite`
-			// until it is 'consumed'
+		// Won't be reached if the above throws, leaving the error to be handled
+		// by forEach() or end()
+		pendingWrite = undefined;
+	}
+
+	function consumeEarlyFlushError() {
+		if (pendingWrite?.isRejected) {
+			const reason = pendingWrite.reason as Error;
 			pendingWrite = undefined;
+			return reason;
 		}
 	}
 
-	function consumeEarlyEndError() {
-		if (pendingWrite?.isRejected) {
-			const reason = pendingWrite.reason;
-			pendingWrite = undefined;
-			return reason;
+	async function settleEarlyFlush() {
+		try {
+			await pendingWrite?.promise;
+		} catch (e) {
+			return consumeEarlyFlushError();
 		}
 	}
 
@@ -194,49 +181,39 @@ export function batch<T>(
 		async (v: T): Promise<void> => {
 			queue.push(v);
 			let flushFailureError: Error | undefined;
+			let earlyFlushError: Error | undefined;
 
 			if (queue.length >= maxBatchSize) {
 				try {
 					// backpressure
+					earlyFlushError = await settleEarlyFlush();
 					await flush();
 				} catch (e) {
 					flushFailureError = e;
 				}
-			} else if (queue.length >= minBatchSize) {
+			} else if (queue.length >= minBatchSize && !pendingWrite) {
 				// no backpressure yet (until new queue fills to maxBatchSize)
 				earlyFlush();
-			} else if (
-				flushTimeout !== undefined &&
-				queue.length &&
-				!pendingWrite
-			) {
-				if (timer !== undefined) {
-					clearTimeout(timer);
-				}
-				timer = setTimeout(earlyFlush, flushTimeout);
 			}
 
-			throwIfThrowable(consumeEarlyEndError());
+			throwIfThrowable(consumeEarlyFlushError());
 			throwIfThrowable(flushFailureError);
 		},
 		async (error?: Error) => {
 			let flushError: Error | undefined;
 
+			let earlyFlushError: Error | undefined = await settleEarlyFlush();
 			try {
 				await flush();
 			} catch (e) {
 				flushError = e;
 			}
 
-			const earlyError = consumeEarlyEndError();
-
-			console.log("writable.end");
-
 			await writable.end(
-				error || earlyError || flushError,
+				error || earlyFlushError || flushError,
 				readable.result()
 			);
-			throwIfThrowable(earlyError || flushError);
+			throwIfThrowable(earlyFlushError || flushError);
 		},
 		flush
 	);
