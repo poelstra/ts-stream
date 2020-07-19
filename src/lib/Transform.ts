@@ -8,6 +8,7 @@
 
 import { Readable, Stream, Writable } from "./Stream";
 import { TrackedVoidPromise, track, swallowErrors, noop } from "./util";
+import { BatcherOptions } from "./transformers";
 
 export type Transform<In, Out> = (
 	readable: Readable<In>,
@@ -117,8 +118,11 @@ export function batch<T>(
 	readable: Readable<T>,
 	writable: Writable<T[]>,
 	maxBatchSize: number,
-	minBatchSize = maxBatchSize,
-	flushTimeout: number | undefined
+	{
+		minBatchSize = maxBatchSize,
+		flushTimeout,
+		errorHandler,
+	}: BatcherOptions<T> = {}
 ): void {
 	writable.aborted().catch((err: Error) => readable.abort(err));
 	readable.aborted().catch((err) => writable.abort(err));
