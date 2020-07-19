@@ -2042,7 +2042,8 @@ describe("Stream", () => {
 			setTimeout(done, 10);
 		});
 
-		it("should wait for source stream before passing on result", (done) => {
+		it("should wait for source stream before passing on result", async () => {
+			const endError = new Error("endError");
 			const result = new Stream();
 			const stream = new Stream();
 			const d = defer();
@@ -2060,28 +2061,26 @@ describe("Stream", () => {
 			);
 
 			let ended = false;
-			let finished = false;
+			let finished: Error | undefined;
 			result
 				.forEach(
 					() => undefined,
-					(e) => {
+					(err) => {
 						ended = true;
-						throw e;
+						throw endError;
 					}
 				)
-				.catch(() => {
-					finished = true;
+				.catch((e) => {
+					finished = e;
 				});
 
-			setTimeout(() => {
-				expect(ended).to.equal(true);
-				expect(finished).to.equal(false);
-				d.resolve();
-				setTimeout(() => {
-					expect(finished).to.equal(true);
-					done();
-				}, 10);
-			}, 10);
+			await delay(0); // have to tick macro queue
+			expect(ended).to.equal(true);
+			expect(finished).to.equal(undefined);
+			d.resolve();
+
+			await delay(0); // have to tick macro queue
+			expect(finished).to.equal(endError);
 		});
 	});
 });
