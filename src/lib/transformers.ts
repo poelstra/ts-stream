@@ -25,9 +25,10 @@ export function filterer<T>(
 	};
 }
 
-export type BatcherOptions = {
+export type BatcherOptions<T> = {
 	minBatchSize?: number;
 	flushTimeout?: number;
+	errorHandler?: (e: Error, batch: T[]) => void;
 };
 
 /**
@@ -63,9 +64,9 @@ export type BatcherOptions = {
  */
 export function batcher<T>(
 	maxBatchSize: number,
-	{ minBatchSize = maxBatchSize, flushTimeout }: BatcherOptions = {}
+	options: BatcherOptions<T> = {}
 ): Transform<T, T[]> {
 	return (readable: Readable<T>, writable: Writable<T[]>): void => {
-		batch(readable, writable, maxBatchSize, minBatchSize, flushTimeout);
+		batch(readable, writable, maxBatchSize, options);
 	};
 }

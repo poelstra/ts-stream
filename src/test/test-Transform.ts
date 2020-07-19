@@ -419,12 +419,11 @@ describe("Transform", () => {
 
 						const batched = s.transform(batcher(2));
 
-						async function doWrites() {
+						async function doLongerWrites() {
 							let firstError: Error | undefined;
 							const ops = [
 								() => s.write(1),
-								() => delay(2),
-								() => s.write(3),
+								() => s.write(1),
 								() => s.write(2),
 								() => s.end(),
 							];
@@ -444,7 +443,7 @@ describe("Transform", () => {
 
 						await Promise.all([
 							batched.forEach(conditionalThrow(testCase)),
-							expect(doWrites()).rejectedWith(boomError),
+							expect(doLongerWrites()).rejectedWith(boomError),
 						]);
 
 						expect(isAborted).to.equal(false);
@@ -490,29 +489,33 @@ describe("Transform", () => {
 			})
 		);
 
-		it("responds properly to abort", async () => {
-			const source = Stream.from([
-				{
-					value: 1,
-				},
-				{
-					abort: true,
-					value: 2,
-				},
-				{
-					value: 3,
-				},
-			]);
+		it(
+			"on abort, all writes fail with abort, including writes still in the queue",
+			clockwise(async () => {
+				async function doWrites() {
+					await expect(s.write(1)).to.eventually.equal(undefined);
+					await expect(s.write(2)).to.eventually.equal(undefined);
+					await expect(s.write(3)).to.eventually.equal(undefined);
+					await delay(2);
+					await expect(s.end()).to.eventually.rejectedWith(
+						abortError
+					);
+				}
 
-			const batched = pipeWithDelay(source).transform(batcher(2));
+				const writePromise = doWrites();
+				const batched = s.transform(batcher(2));
+				const readPromise = expect(
+					readInto(batched, batchResults)
+				).eventually.rejectedWith(abortError);
 
-			try {
-				await resolveBatchToAsyncValues(batched);
-				throw new Error("Expected error");
-			} catch (e) {
-				expect(e.message).to.equal(abortError.message);
-			}
-		});
+				await delay(1);
+				s.abort(abortError);
+
+				await Promise.all([writePromise, readPromise]);
+
+				expect(batchResults).to.deep.equal([[1, 2]]);
+			})
+		);
 
 		it(
 			"waits for source stream to end",

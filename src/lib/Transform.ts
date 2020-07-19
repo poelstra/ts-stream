@@ -136,7 +136,9 @@ export function batch<T>(
 			const peeled = queue;
 			queue = [];
 
-			await writable.write(peeled);
+			await writable
+				.write(peeled)
+				.catch(errorHandler && ((e) => errorHandler(e, queue)));
 		}
 	}
 
@@ -208,6 +210,7 @@ export function batch<T>(
 				try {
 					// backpressure
 					earlyFlushError = await settleEarlyFlush();
+
 					await flush();
 				} catch (e) {
 					flushFailureError = e;
@@ -233,11 +236,27 @@ export function batch<T>(
 				flushError = e;
 			}
 
-			await writable.end(error, readable.result().catch(noop));
-			throwIfThrowable(earlyFlushError);
-			throwIfThrowable(flushError);
+			const toThrow = earlyFlushError || flushError;
+
+			await writable.end(
+				error,
+				toThrow
+					? readable.result().catch((e) => {
+							if (e !== toThrow) {
+								throw e;
+							}
+					  })
+					: readable.result()
+			);
+
+			throwIfThrowable(toThrow);
 		},
-		flush
+		() => {
+			if (!pendingWrite) {
+				// Trigger write errors on what is already in the queue, as early as possible
+				swallowErrors(earlyFlush());
+			}
+		}
 	);
 }
 
