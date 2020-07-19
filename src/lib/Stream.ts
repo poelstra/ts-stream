@@ -756,10 +756,6 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 				)
 			);
 		}
-		if (error && !endedResult) {
-			endedResult = Promise.reject(error);
-			swallowErrors(endedResult);
-		}
 		const eof = new Eof(error, endedResult);
 		if (!this._ending && !this._ended) {
 			this._ending = eof;
@@ -1499,19 +1495,27 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 				this._endPending = undefined;
 				this._aborter = undefined; // no longer call aborter after end handler has finished
 				let p: PromiseLike<void>;
+				// Determine final result()
 				if (result) {
-					// wait for the result, but be sure to throw the original error, if any
-					p = this._readBusy.promise.then(
-						() => result,
-						(e) => {
-							const thrower = () => {
-								throw e;
-							};
-							return result.then(thrower, thrower);
-						}
-					);
+					// Explicit result promise was passed to end().
+					// Make sure to wait until the ender is fully completed,
+					// which can be fulfilled or rejected. Ender's rejection is
+					// ignored here, because it is already passed upstream, and
+					// result then comes back downstream. This allows upstream to
+					// decide how to handle a downstream ender's failure.
+					p = this._readBusy.promise
+						.then(undefined, noop)
+						.then(() => result);
 				} else {
-					p = this._readBusy.promise;
+					// No explicit result passed to end().
+					// Wait for ender to complete, if it throws, pass that
+					// error along, if it doesn't throw but an error was passed
+					// to end, use that error as the stream's result
+					p = this._readBusy.promise.then(() => {
+						if (this._ended !== EOF) {
+							throw this._ended;
+						}
+					});
 				}
 				this._resultDeferred.resolve(p);
 			}

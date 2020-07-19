@@ -8,6 +8,10 @@
 
 /* tslint:disable:no-null-keyword */ // we use a lot of speficic null-checks below
 
+import * as chaiAsPromised from "chai-as-promised";
+import * as chai from "chai";
+chai.use(chaiAsPromised);
+
 import { expect } from "chai";
 
 import {
@@ -546,6 +550,37 @@ describe("Stream", () => {
 			expect(results).to.deep.equal([1, 2]);
 			expect(we.isFulfilled).to.equal(true);
 			expect(res.reason).to.equal(boomError);
+		});
+
+		describe("ender errors", () => {
+			it("returns ender error to `end()` and reflects it in `result()` by default", async () => {
+				// Rationale: if error from `end()` is not explicitly handled,
+				// we 'bounce' it back downstream.
+				// The only way to 'handle' it (i.e. to communicate its result
+				// to observers of the stream) is to influence the stream's result,
+				// which can only be done by passing that result to end()'s second
+				// argument. No such argument is given here, so by default we bounce that error.
+				const result = s.forEach(noop, () => {
+					throw boomError;
+				});
+				const we = s.end();
+				await expect(result).rejectedWith(boomError);
+				await expect(we).rejectedWith(boomError);
+			});
+
+			it("allows overriding result even if ender fails", async () => {
+				const result = track(
+					s.forEach(noop, () => {
+						throw boomError;
+					})
+				);
+				const d = defer();
+				const we = s.end(undefined, d.promise);
+				await expect(we).rejectedWith(boomError);
+				expect(result.isPending).to.equal(true);
+				d.resolve();
+				await result.promise;
+			});
 		});
 
 		it("disallows multiple attach", async () => {
@@ -2043,16 +2078,21 @@ describe("Stream", () => {
 		});
 
 		it("should wait for source stream before passing on result", async () => {
+			const enderError = new Error("enderError");
 			const endError = new Error("endError");
 			const result = new Stream();
 			const stream = new Stream();
 			const d = defer();
 
-			// Create stream that already ended with an error
-			swallowErrors(stream.end(new Error("foo")));
+			// Create stream that already ended with an error.
+			// `stream.forEach()`'s ender itself doesn't throw,
+			// so this `end()` also doesn't.
+			// Because we don't pass an explicit result, the final
+			// result will be our end error.
+			stream.end(endError);
 
-			// Pipe to follow-up stream, but make the end of this stream wait on `d`
-			stream.forEach(
+			// Pipe to follow-up stream, but make the end of result stream wait on `d`
+			const streamResult = stream.forEach(
 				(v) => result.write(v),
 				(e) => {
 					swallowErrors(result.end(e, stream.result()));
@@ -2067,20 +2107,24 @@ describe("Stream", () => {
 					() => undefined,
 					(err) => {
 						ended = true;
-						throw endError;
+						throw enderError;
 					}
 				)
 				.catch((e) => {
 					finished = e;
 				});
 
+			// Prevent unhandled rejection errors due to delays below
+			streamResult.catch(noop);
+
 			await delay(0); // have to tick macro queue
 			expect(ended).to.equal(true);
 			expect(finished).to.equal(undefined);
-			d.resolve();
 
+			d.resolve();
 			await delay(0); // have to tick macro queue
 			expect(finished).to.equal(endError);
+			expect(streamResult).eventually.rejectedWith(endError);
 		});
 	});
 });
