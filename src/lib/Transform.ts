@@ -121,7 +121,7 @@ export function batch<T>(
 	{
 		minBatchSize = maxBatchSize,
 		flushTimeout,
-		errorHandler,
+		handleError,
 	}: BatcherOptions<T> = {}
 ): void {
 	writable.aborted().catch((err: Error) => readable.abort(err));
@@ -138,7 +138,7 @@ export function batch<T>(
 
 			await writable
 				.write(peeled)
-				.catch(errorHandler && ((e) => errorHandler(e, queue)));
+				.catch(handleError && ((e) => handleError(e, queue)));
 		}
 	}
 
