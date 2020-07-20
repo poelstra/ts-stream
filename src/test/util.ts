@@ -35,22 +35,20 @@ export function readInto<T>(
 	into: T[]
 ): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
-		stream
-			.forEach(
-				function (this: any, value: T): void {
-					expect(this).to.equal(undefined);
-					into.push(value);
-				},
-				function (this: any, err?: Error): void {
-					expect(this).to.equal(undefined);
-					if (err) {
-						reject(err);
-					} else {
-						resolve(undefined);
-					}
+		stream.forEach(
+			function (this: any, value: T): void {
+				expect(this).to.equal(undefined);
+				into.push(value);
+			},
+			function (this: any, err?: Error): void {
+				expect(this).to.equal(undefined);
+				if (err) {
+					reject(err);
+				} else {
+					resolve(undefined);
 				}
-			)
-			.catch((e) => reject(e));
+			}
+		);
 	});
 }
 

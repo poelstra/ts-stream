@@ -504,9 +504,14 @@ describe("Transform", () => {
 
 				const writePromise = doWrites();
 				const batched = s.transform(batcher(2));
+
+				const listener = batched.map((batch) =>
+					batchResults.push(batch)
+				);
+
 				const readPromise = expect(
-					readInto(batched, batchResults)
-				).eventually.rejectedWith(abortError);
+					listener.toArray()
+				).to.eventually.rejectedWith(abortError);
 
 				await delay(1);
 				s.abort(abortError);
