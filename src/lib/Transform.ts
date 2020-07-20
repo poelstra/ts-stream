@@ -222,11 +222,11 @@ export function batch<T>(
 			}
 
 			const toThrow =
-				earlyFlushError ||
+				earlyFlushError ??
 				// If there was an error in earlyFlush() and we weren't awaiting it, try to capture it here.
 				// If we didn't do this, the error would be captured anyway in the next call to write()
 				// or end(), but it's better to get it earlier if we can.
-				consumeEarlyFlushError() ||
+				consumeEarlyFlushError() ??
 				// Default to any error that occurred in the normal, backpressured flush().
 				// NOTE: Errors from earlyFlush() will shadow this one. If this is a concern for the caller,
 				// they can instead use the handleError() parameter, which is guaranteed to run on every error.
