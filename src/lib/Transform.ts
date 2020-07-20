@@ -238,16 +238,7 @@ export function batch<T>(
 
 			const toThrow = earlyFlushError || flushError;
 
-			await writable.end(
-				error,
-				toThrow
-					? readable.result().catch((e) => {
-							if (e !== toThrow) {
-								throw e;
-							}
-					  })
-					: readable.result()
-			);
+			await writable.end(error, readable.result());
 
 			throwIfThrowable(toThrow);
 		},

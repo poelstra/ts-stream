@@ -347,7 +347,7 @@ describe("Transform", () => {
 					await delay(2);
 					await s.write(2);
 				} finally {
-					await s.end();
+					await s.end(undefined, Promise.resolve());
 				}
 			}
 
@@ -425,7 +425,7 @@ describe("Transform", () => {
 								() => s.write(1),
 								() => s.write(1),
 								() => s.write(2),
-								() => s.end(),
+								() => s.end(undefined, Promise.resolve()),
 							];
 
 							for (const op of ops) {
