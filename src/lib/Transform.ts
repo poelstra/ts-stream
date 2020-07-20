@@ -53,7 +53,7 @@ function composeEnders(
 					// back.
 					// Finally, make sure to return the enderError.
 					return Promise.resolve(
-						defaultEnder(error || enderError)
+						defaultEnder(error ?? enderError)
 					).then(
 						() => Promise.reject(enderError),
 						() => Promise.reject(enderError)
@@ -246,7 +246,7 @@ export function batch<T>(
 				flushError = e;
 			}
 
-			const toThrow = earlyFlushError || flushError;
+			const toThrow = earlyFlushError ?? flushError;
 
 			await writable.end(error, readable.result());
 

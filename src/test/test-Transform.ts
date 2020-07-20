@@ -347,6 +347,8 @@ describe("Transform", () => {
 					await delay(2);
 					await s.write(2);
 				} finally {
+					// Pass Promise.resolve() to end() to cause the downstream result to depend
+					// on this (resolved) promise, instead of the promise rejection that is expected.
 					await s.end(undefined, Promise.resolve());
 				}
 			}
@@ -420,24 +422,14 @@ describe("Transform", () => {
 						const batched = s.transform(batcher(2));
 
 						async function doLongerWrites() {
-							let firstError: Error | undefined;
-							const ops = [
-								() => s.write(1),
-								() => s.write(1),
-								() => s.write(2),
-								() => s.end(undefined, Promise.resolve()),
-							];
-
-							for (const op of ops) {
-								try {
-									await op();
-								} catch (e) {
-									firstError = firstError || e;
-								}
-							}
-
-							if (firstError) {
-								throw firstError;
+							try {
+								await s.write(1);
+								await s.write(1);
+								await s.write(2);
+							} finally {
+								// Pass Promise.resolve() to end() to cause the downstream result to depend
+								// on this (resolved) promise, instead of the promise rejection that is expected.
+								await s.end(undefined, Promise.resolve());
 							}
 						}
 
