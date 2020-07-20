@@ -138,7 +138,7 @@ export function batch<T>(
 
 			await writable
 				.write(peeled)
-				.catch(handleError && ((e) => handleError(e, queue)));
+				.catch(handleError && ((e) => handleError(e, peeled)));
 		}
 	}
 
