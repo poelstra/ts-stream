@@ -71,7 +71,8 @@ export type BatcherOptions<T> = {
  * @param options.handleError? If set, any write error this stream would throw will instead be run
  * through the provided function, with the error as the first argument and the second argument being
  * the batch that experienced the failure.
- * If handleError throws an error, that error will be thrown by the stream as normal; if not
+ * If handleError throws an error, that error will be thrown by the stream as normal; if not, the
+ * error will be ignored and the stream will continue.
  * @return New readable stream emitting values from its source in batches.
  */
 export function batcher<T>(
