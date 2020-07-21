@@ -84,3 +84,89 @@ export function batcher<T>(
 		batch(readable, writable, maxBatchSize, options);
 	};
 }
+
+/**
+ * Transform to intercept downstream errors on stream end before they reach the
+ * upstream source and propagate back down.
+ * 
+ * This is a niche utility. It only needs to be used when you want your *source* to
+ * recover from errors thrown by downstream enders.
+ * 
+ * By default, any time a call to `end()` throws an error, that error gets thrown
+ * from the ended stream's `result()`. However, if the caller provides an upstream's
+ * `result()` as the second parameter to `end()`, this behaviour is averted and the
+ * stream's `result()` will instead depend on that Promise (which can be resolved
+ * or rejected as the upstream chooses).
+ * 
+ * However, if it's the source that is calling `end()`, there is no upstream to use
+ * as the ender's second argument. This means the source cannot properly catch errors
+ * before they are sent to the downstream's `result()`.
+ * 
+ * With the `endCatcher()` transform, you can simulate the behaviour of try-catch in
+ * this special case. To recover from the error, have `handleError()` return normally.
+ * To fail, simply re-throw the provided error (or a new, more appropriate Error).
+ * 
+ * Example:
+// Without endCatcher()
+const source = new Stream<T>();
+source.write("Craig");
+source.write("Jolene");
+source.write("Sam");
+source.write("Cassandra");
+source.write("Xavier");
+source.end().catch((e) => {
+	if (e.message === "Too many guests!") {
+		requestBiggerTable();
+	} else {
+		throw e;
+	}
+});
+
+source.forEach(
+	addGuestToReservation,
+	() => {
+		if (guestsAdded() > 4) {
+			throw new Error("Too many guests!")
+		}
+	}
+); // This throws an unhandled promise rejection error, even though the source handled it!
+
+// With endCatcher()
+const source = new Stream<T>();
+source.write("Craig");
+source.write("Jolene");
+source.write("Sam");
+source.write("Cassandra");
+source.write("Xavier");
+source.end();
+
+source.transform(endCatcher((e) => {
+	if (e.message === "Too many guests!") {
+		requestBiggerTable();
+	} else {
+		throw e;
+	}
+}))
+	.forEach(
+		addGuestToReservation,
+		() => {
+			if (guestsAdded() > 4) {
+				throw new Error("Too many guests!")
+			}
+		}
+	); // No longer throws the error, because `handleError()` completes successfully
+ * 
+ * @param handleError 
+ */
+export function endCatcher<T>(
+	handleError: (e: Error) => void | PromiseLike<void>
+): Transform<T, T> {
+	return (readable: Readable<T>, writable: Writable<T>): void => {
+		writable.aborted().catch((err) => readable.abort(err));
+		readable.aborted().catch((err) => writable.abort(err));
+		readable.forEach(
+			(value: T) => writable.write(value),
+			(error?: Error) => writable.end(error, readable.result()).catch(handleError)
+		);
+	};
+}
