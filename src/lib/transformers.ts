@@ -28,7 +28,7 @@ export function filterer<T>(
 export type BatcherOptions<T> = {
 	minBatchSize?: number;
 	flushTimeout?: number;
-	handleError?: (e: Error, batch: T[]) => void;
+	handleError?: (e: Error, batch: T[]) => void | PromiseLike<void>;
 };
 
 /**
