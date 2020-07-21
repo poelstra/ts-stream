@@ -94,7 +94,7 @@ console.log(result);
 Naturally, if the stream ends with an error, the result of `toArray()` is
 also rejected with that error.
 
-# Handling values in batches
+## Handling values in batches
 
 You can use the built-in `batcher()` transform to break an incoming stream up
 into batches of a given max size:
