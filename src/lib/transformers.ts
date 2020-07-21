@@ -61,7 +61,8 @@ export type BatcherOptions<T> = {
  * batcher is still actively reading items, it is not guaranteed that the caller will receive
  * all errors that occurred (although it is guaranteed that the caller will receive at least one,
  * if one error did in fact occur). The `handleError` parameter overcomes this limitation: it
- * executes on every error and receives a parameter indicating the items that failed.
+ * executes on every error and receives a parameter indicating the batch that experienced the
+ * failure.
  *
  * @param maxBatchSize The maximum length of batch for the stream to emit.
  * @param options.minBatchSize? The minimum length of batch that the stream will try to emit if
