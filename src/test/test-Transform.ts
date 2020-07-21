@@ -260,6 +260,15 @@ describe("Transform", () => {
 				let captured: Error | undefined;
 				const failedWrites: number[][] = [];
 
+				const confirmedError1 = new Error("Yep, that’s an error");
+				const confirmedError2 = new Error(
+					"This is for sure an error, too"
+				);
+				const toThrowFromErrorHandler = [
+					confirmedError1,
+					confirmedError2,
+				];
+
 				const batched = s.transform(
 					batcher(2, {
 						flushTimeout: 1,
@@ -270,15 +279,6 @@ describe("Transform", () => {
 						},
 					})
 				);
-
-				const confirmedError1 = new Error("Yep, that’s an error");
-				const confirmedError2 = new Error(
-					"This is for sure an error, too"
-				);
-				const toThrowFromErrorHandler = [
-					confirmedError1,
-					confirmedError2,
-				];
 
 				async function doWrites() {
 					expect(s.write(1)).to.eventually.equal(undefined);
