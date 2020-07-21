@@ -134,6 +134,14 @@ describe("Transform", () => {
 				.toArray();
 		}
 
+		it("passes the example test from docs", async () => {
+			const batchedStream = Stream.from([1, 2, 3, 4, 5]).transform(
+				batcher(2)
+			);
+			const result = await batchedStream.toArray();
+			expect(result).to.deep.equal([[1, 2], [3, 4], [5]]);
+		});
+
 		it("batches values", async () => {
 			const batched = s.transform(batcher(2));
 			const toWrite = [1, 2, 3];
