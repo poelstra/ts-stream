@@ -58,8 +58,7 @@ describe("Transform", () => {
 		 * Run an async function, advance the sinon mocked clock until the function resolves,
 		 * and then return the function's promise.
 		 *
-		 * This avoids situations where you need to await something but the await is blocking
-		 * the code to advance the clock.
+		 * This avoids the need to explicitly advance the clock.
 		 *
 		 * @param fn A test function
 		 */
@@ -197,6 +196,106 @@ describe("Transform", () => {
 
 			expect(dest).to.deep.equal([[1, 2], [3]]);
 		});
+
+		it("with `handleError`, can suppress errors in a flush", async () => {
+			s.write(1);
+			s.write(2);
+			s.write(3);
+			s.end();
+			let captured: Error | undefined;
+			const failedWrites: number[][] = [];
+			const batched = s.transform(
+				batcher(2, {
+					handleError: (e, batch) => {
+						captured = e;
+						failedWrites.push(batch);
+					},
+				})
+			);
+
+			await batched.forEach(() => {
+				throw boomError;
+			});
+
+			expect(captured).to.equal(boomError);
+			expect(failedWrites).to.deep.equal([[1, 2], [3]]);
+		});
+
+		it("with `handleError`, can suppress errors in an early flush", async () => {
+			s.write(1);
+			s.write(2);
+			s.write(3);
+			s.end();
+			let captured: Error | undefined;
+			const failedWrites: number[][] = [];
+			const batched = s.transform(
+				batcher(2, {
+					minBatchSize: 1,
+					handleError: (e, batch) => {
+						captured = e;
+						failedWrites.push(batch);
+					},
+				})
+			);
+
+			await batched.forEach(() => {
+				throw boomError;
+			});
+
+			expect(captured).to.equal(boomError);
+			expect(failedWrites).to.deep.equal([[1], [2, 3]]);
+		});
+
+		it(
+			"with `handleError`, can re-throw errors in any flush",
+			clockwise(async () => {
+				let captured: Error | undefined;
+				const failedWrites: number[][] = [];
+
+				const batched = s.transform(
+					batcher(2, {
+						flushTimeout: 1,
+						handleError: async (e, batch) => {
+							captured = e;
+							failedWrites.push(batch);
+							throw toThrowFromErrorHandler.shift();
+						},
+					})
+				);
+
+				const confirmedError1 = new Error("Yep, that’s an error");
+				const confirmedError2 = new Error(
+					"This is for sure an error, too"
+				);
+				const toThrowFromErrorHandler = [
+					confirmedError1,
+					confirmedError2,
+				];
+
+				async function doWrites() {
+					expect(s.write(1)).to.eventually.equal(undefined);
+					await delay(2); // Trigger early flush
+					expect(s.write(2)).to.eventually.rejectedWith(
+						confirmedError1
+					); // Catching the error thrown by the early flush
+					expect(s.write(3)).to.eventually.rejectedWith(
+						confirmedError2
+					); // Catching the error of the next, normal flush
+					expect(s.end()).to.eventually.equal(undefined);
+				}
+
+				const writePromise = doWrites();
+
+				const readPromise = batched.forEach(async () => {
+					throw boomError;
+				});
+
+				await Promise.all([writePromise, readPromise]);
+
+				expect(captured).to.equal(boomError);
+				expect(failedWrites).to.deep.equal([[1], [2, 3]]);
+			})
+		);
 
 		it(
 			"applies backpressure to a `maxBatchSize` write from a `minBatchSize` write",
