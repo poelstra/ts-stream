@@ -94,6 +94,25 @@ console.log(result);
 Naturally, if the stream ends with an error, the result of `toArray()` is
 also rejected with that error.
 
+## Handling values in batches
+
+You can use the built-in `batcher()` transform to break an incoming stream up
+into batches of a given max size:
+
+```ts
+const batchedStream = Stream.from([1, 2, 3, 4, 5]).transform(batcher(2));
+const result = await batchedStream.toArray();
+console.log(result);
+// [[1, 2], [3, 4], [5]]
+```
+
+With its optional parameters, `batcher()` can also handle things like:
+
+-   "Eagerly" sending smaller batches when not waiting for downstream processing to complete
+-   Forming batches with whatever is available after a timeout
+
+See the docs of `batcher()` for more details of how to use it.
+
 ## Handling a stream end
 
 Pass an extra callback to `forEach()` which gets called when the stream is

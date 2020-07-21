@@ -16,41 +16,22 @@ import { expect } from "chai";
 
 import {
 	AlreadyHaveReaderError,
-	ReadableStream,
 	Stream,
 	Transform,
 	WriteAfterEndError,
 } from "../lib/index";
 
 import "./mocha-init";
-import { defer, delay, settle, swallowErrors, track } from "./util";
-
-function readInto<T>(stream: ReadableStream<T>, into: T[]): Promise<void> {
-	return new Promise<void>((resolve, reject) => {
-		stream.forEach(
-			function (this: any, value: T): void {
-				expect(this).to.equal(undefined);
-				into.push(value);
-			},
-			function (this: any, err?: Error): void {
-				expect(this).to.equal(undefined);
-				if (err) {
-					reject(err);
-				} else {
-					resolve(undefined);
-				}
-			}
-		);
-	});
-}
-
-function noop(): void {
-	/* empty */
-}
-
-function identity<T>(arg: T): T {
-	return arg;
-}
+import {
+	defer,
+	delay,
+	settle,
+	swallowErrors,
+	track,
+	readInto,
+	noop,
+	identity,
+} from "./util";
 
 describe("Stream", () => {
 	let s: Stream<number>;
@@ -839,6 +820,7 @@ describe("Stream", () => {
 
 			d.resolve();
 			await settle([mres.promise]);
+			expect(writes[2].isFulfilled).to.equal(true);
 		});
 
 		it("waits for destination stream to end", async () => {
@@ -1089,6 +1071,21 @@ describe("Stream", () => {
 	describe("filter()", () => {
 		it("filters values", async () => {
 			const filtered = s.filter((n) => n % 2 === 0);
+			const writes = [
+				track(s.write(1)),
+				track(s.write(2)),
+				track(s.end()),
+			];
+			readInto(filtered, results);
+			await s.result();
+			expect(results).to.deep.equal([2]);
+			expect(writes[0].isFulfilled).to.equal(true);
+			expect(writes[1].isFulfilled).to.equal(true);
+			expect(writes[2].isFulfilled).to.equal(true);
+		});
+
+		it("filters values async", async () => {
+			const filtered = s.filter(async (n) => n % 2 === 0);
 			const writes = [
 				track(s.write(1)),
 				track(s.write(2)),
@@ -2068,7 +2065,7 @@ describe("Stream", () => {
 	}); // from()
 
 	describe("issue #31", (): void => {
-		it("should not result in unhandled rejections", (done) => {
+		it("should not result in unhandled rejections", (done: Mocha.Done) => {
 			const result = new Stream();
 			const stream = new Stream();
 			stream.end(new Error("foo")).catch((error) => undefined);
