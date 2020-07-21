@@ -32,34 +32,46 @@ export type BatcherOptions<T> = {
 };
 
 /**
- * Transformer to pipe arrays of elements in regular batches.
+ * Transformer that pipes arrays of elements in regular batches. Useful to gather
+ * items together for more efficient bulk operations, like writing rows to a database
+ * or saving files to a remote data store.
  *
- * The stream keeps an internal queue. When the queue reaches `maxBatchSize`, all its
- * contents are written to the stream.
+ * The transformer tries to emit batches of size `maxBatchSize` with the items it
+ * receives. If items are left over when the stream ends, it emits them as a batch.
  *
- * If `minBatchSize` is set, the queue will try to write its contents to the stream
- * when the queue reaches `minBatchSize`, but only if there is no previous asynchronous
- * write in progress.
+ * With `minBatchSize` set, the stream's behaviour depends on backpressure from downstream
+ * (i.e., if there are any async reads in progress). If there is no backpressure, it will
+ * emit a batch of size `minBatchSize` as soon as possible. If there is backpressure, it
+ * will wait until it has a batch of `maxBatchSize` before emitting it.
  *
- * In other words, `minBatchSize` declares the smallest batch that successive transforms
- * consider "worthwhile" to handle, while `maxBatchSize` declares the largest batch that
- * successive transforms can comfortably handle in a single operation (think writes to a
- * database or calls to an external API).
+ * You can think of `maxBatchSize` as the largest batch that you *can* process at once,
+ * while `minBatchSize` is the smallest batch that is *worth* processing all at once
+ * for efficiency.
  *
- * If `flushTimeout` is set, the queue will always begin writing its contents within the
- * specified time period (in milliseconds). In the case of sources that provide sporadic
- * input over a long interval, this can be used to ensure that short bursts of input
- * aren't held up indefinitely as they wait for enough elements to cross the `minBatchSize`
- * threshold.
+ * If `flushTimeout` is set, the stream will wait no longer than `flushTimeout` milliseconds
+ * to emit a batch. This is useful to avoid holding onto items during periods of inactivity
+ * in a long-running stream, like when processing input from an event listener.
  *
- * When the stream ends, all remaining elements in the queue are written, regardless of any
- * thresholds.
+ * The optional `handleError` parameter is a function that runs each time an error occurs
+ * during downstream processing of writes. If it throws an error, that error becomes the
+ * write error to throw upstream; if it doesn't, the error is considered resolved and won't
+ * be thrown.
+ *
+ * Because the batcher's write operation sometimes occurs "in the background" while the
+ * batcher is still actively reading items, it is not guaranteed that the caller will receive
+ * all errors that occurred (although it is guaranteed that the caller will receive at least one,
+ * if one error did in fact occur). The `handleError` parameter overcomes this limitation: it
+ * executes on every error and receives a parameter indicating the items that failed.
  *
  * @param maxBatchSize The maximum length of batch for the stream to emit.
  * @param options.minBatchSize? The minimum length of batch that the stream will try to emit if
  * no write is in progress. Defaults to `maxBatchSize`.
  * @param options.flushTimeout? The interval in milliseconds after which the stream will emit
  * all source values, even if there are fewer than `minBatchSize` of them.
+ * @param options.handleError? If set, any write error this stream would throw will instead be run
+ * through the provided function, with the error as the first argument and the second argument being
+ * the batch that experienced the failure.
+ * If handleError throws an error, that error will be thrown by the stream as normal; if not
  * @return New readable stream emitting values from its source in batches.
  */
 export function batcher<T>(
