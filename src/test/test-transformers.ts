@@ -2,9 +2,7 @@ import * as chaiAsPromised from "chai-as-promised";
 import * as chai from "chai";
 chai.use(chaiAsPromised);
 
-import {
-	endCatcher
-} from "../lib/transformers";
+import { endCatcher } from "../lib/transformers";
 
 import "./mocha-init";
 import { useFakeTimers } from "sinon";
@@ -32,7 +30,9 @@ describe("transformers", () => {
 
 	describe("endCatcher()", () => {
 		it("passes the example test from docs", () => {
-			function requestBiggerTable() { /** Aesthetic */ }
+			function requestBiggerTable() {
+				/** Aesthetic */
+			}
 			let _guestsAdded = 0;
 			function guestsAdded() {
 				return _guestsAdded;
@@ -57,15 +57,12 @@ describe("transformers", () => {
 					}
 				});
 
-				source.forEach(
-					addGuestToReservation,
-					() => {
-						if (guestsAdded() > 4) {
-							throw new Error("Too many guests!")
-						}
+				source.forEach(addGuestToReservation, () => {
+					if (guestsAdded() > 4) {
+						throw new Error("Too many guests!");
 					}
-				); // This throws an unhandled promise rejection error, even though the source handled it!
-			})
+				}); // This throws an unhandled promise rejection error, even though the source handled it!
+			});
 
 			it("Part 2", () => {
 				// With endCatcher()
@@ -77,21 +74,21 @@ describe("transformers", () => {
 				source.write("Xavier");
 				source.end();
 
-				source.transform(endCatcher((e) => {
-					if (e.message === "Too many guests!") {
-						requestBiggerTable();
-					} else {
-						throw e;
-					}
-				}))
-					.forEach(
-						addGuestToReservation,
-						() => {
-							if (guestsAdded() > 4) {
-								throw new Error("Too many guests!")
+				source
+					.transform(
+						endCatcher((e) => {
+							if (e.message === "Too many guests!") {
+								requestBiggerTable();
+							} else {
+								throw e;
 							}
+						})
+					)
+					.forEach(addGuestToReservation, () => {
+						if (guestsAdded() > 4) {
+							throw new Error("Too many guests!");
 						}
-					); // No longer throws the error, because `handleError()` completes successfully
+					}); // No longer throws the error, because `handleError()` completes successfully
 			});
 		});
 	});
