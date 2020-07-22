@@ -120,7 +120,7 @@ export function batcher<T>(
  *       }
  *     }
  *   ); // This throws an unhandled promise rejection error, even if the source handles it!
- * 
+ *
  * // With endCatcher()
  * getRowsFromDatabase<MyObject>(myQuery)
  *   .transform(
@@ -146,7 +146,7 @@ export function batcher<T>(
  *       }
  *     }
  *   ); // No longer throws the error, because handleError() returns successfully
- * 
+ *
  * @param handleError
  */
 export function endCatcher<T>(
