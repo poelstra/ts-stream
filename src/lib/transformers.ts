@@ -106,56 +106,47 @@ export function batcher<T>(
  * this special case. To recover from the error, have `handleError()` return normally.
  * To fail, simply re-throw the provided error (or a new, more appropriate Error).
  *
- * Example:
+ * @example
  * // Without endCatcher()
- * const source = new Stream<string>();
- * source.write("Craig");
- * source.write("Jolene");
- * source.write("Sam");
- * source.write("Cassandra");
- * source.write("Xavier");
- * source.end().catch((e) => {
- *   if (e.message === "Too many guests!") {
- *     requestBiggerTable();
- *   } else {
- *     throw e;
- *   }
- * });
- *
- * source.forEach(
- *   addGuestToReservation,
- *   () => {
- *     if (guestsAdded() > 4) {
- *       throw new Error("Too many guests!")
- *     }
- *   }
- * ); // This throws an unhandled promise rejection error, even though the source handled it!
- *
- * // With endCatcher()
- * const source = new Stream<string>();
- * source.write("Craig");
- * source.write("Jolene");
- * source.write("Sam");
- * source.write("Cassandra");
- * source.write("Xavier");
- * source.end();
- *
- * source.transform(endCatcher((e) => {
- *   if (e.message === "Too many guests!") {
- *     requestBiggerTable();
- *   } else {
- *     throw e;
- *   }
- * }))
+ * getRowsFromDatabase<MyObject>(myQuery)
+ *   .transform(
+ *     // other transforms etc
+ *   )
  *   .forEach(
- *     addGuestToReservation,
+ *     process,
  *     () => {
- *       if (guestsAdded() > 4) {
- *         throw new Error("Too many guests!")
+ *       if (someCondition) {
+ *         throw new NotAllRowsProcessedError();
  *       }
  *     }
- *   ); // No longer throws the error, because handleError() completes successfully
- *
+ *   ); // This throws an unhandled promise rejection error, even if the source handles it!
+ * 
+ * // With endCatcher()
+ * getRowsFromDatabase<MyObject>(myQuery)
+ *   .transform(
+ *     endCatcher((err: Error) => {
+ *       if (
+ *         err instanceof NotAllObjectsProcessedError
+ *       ) {
+ *         // ignore
+ *       } else {
+ *         // re-throw all other errors
+ *         throw err;
+ *       }
+ *     })
+ *   )
+ *   .transform(
+ *     // other transforms etc
+ *   )
+ *   .forEach(
+ *     noop,
+ *     () => {
+ *       if (someCondition) {
+ *         throw new NotAllObjectsProcessedError();
+ *       }
+ *     }
+ *   ); // No longer throws the error, because handleError() returns successfully
+ * 
  * @param handleError
  */
 export function endCatcher<T>(
