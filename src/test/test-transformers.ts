@@ -58,11 +58,13 @@ describe("transformers", () => {
 					}
 				});
 
-				expect(source.forEach(addGuestToReservation, () => {
-					if (guestsAdded() > 4) {
-						throw new Error("Too many guests!");
-					}
-				})).rejectedWith(Error); // This throws an unhandled promise rejection error, even though the source handled it!
+				expect(
+					source.forEach(addGuestToReservation, () => {
+						if (guestsAdded() > 4) {
+							throw new Error("Too many guests!");
+						}
+					})
+				).rejectedWith(Error); // This throws an unhandled promise rejection error, even though the source handled it!
 			})();
 
 			(() => {
