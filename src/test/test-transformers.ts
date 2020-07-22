@@ -53,8 +53,6 @@ describe("transformers", () => {
 				source.end().catch((e) => {
 					if (e.message === "Too many guests!") {
 						requestBiggerTable();
-					} else {
-						throw e;
 					}
 				});
 
@@ -82,8 +80,6 @@ describe("transformers", () => {
 						endCatcher((e) => {
 							if (e.message === "Too many guests!") {
 								requestBiggerTable();
-							} else {
-								throw e;
 							}
 						})
 					)
