@@ -7,6 +7,7 @@ import { endCatcher } from "../lib/transformers";
 import "./mocha-init";
 import { useFakeTimers } from "sinon";
 import Stream from "../lib";
+import { expect } from "chai";
 
 describe("transformers", () => {
 	let s: Stream<number>;
@@ -41,7 +42,7 @@ describe("transformers", () => {
 				_guestsAdded++;
 			}
 
-			it("part 1", () => {
+			(() => {
 				// Without endCatcher()
 				const source = new Stream<string>();
 				source.write("Craig");
@@ -57,14 +58,14 @@ describe("transformers", () => {
 					}
 				});
 
-				source.forEach(addGuestToReservation, () => {
+				expect(source.forEach(addGuestToReservation, () => {
 					if (guestsAdded() > 4) {
 						throw new Error("Too many guests!");
 					}
-				}); // This throws an unhandled promise rejection error, even though the source handled it!
-			});
+				})).rejectedWith(Error); // This throws an unhandled promise rejection error, even though the source handled it!
+			})();
 
-			it("Part 2", () => {
+			(() => {
 				// With endCatcher()
 				const source = new Stream<string>();
 				source.write("Craig");
@@ -89,7 +90,7 @@ describe("transformers", () => {
 							throw new Error("Too many guests!");
 						}
 					}); // No longer throws the error, because `handleError()` completes successfully
-			});
+			})();
 		});
 	});
 });
