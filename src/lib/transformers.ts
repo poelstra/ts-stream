@@ -108,7 +108,7 @@ export function batcher<T>(
  * 
  * Example:
 // Without endCatcher()
-const source = new Stream<T>();
+const source = new Stream<string>();
 source.write("Craig");
 source.write("Jolene");
 source.write("Sam");
@@ -132,7 +132,7 @@ source.forEach(
 ); // This throws an unhandled promise rejection error, even though the source handled it!
 
 // With endCatcher()
-const source = new Stream<T>();
+const source = new Stream<string>();
 source.write("Craig");
 source.write("Jolene");
 source.write("Sam");
