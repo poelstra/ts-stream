@@ -119,7 +119,7 @@ export function batcher<T>(
  *         throw new NotAllRowsProcessedError();
  *       }
  *     }
- *   ); // This throws an unhandled promise rejection error, even if the source handles it!
+ *   ); // This throws a rejection, when the source uses the default behavior of bouncing an error into result
  *
  * // With endCatcher()
  * getRowsFromDatabase<MyObject>(myQuery)
@@ -139,7 +139,7 @@ export function batcher<T>(
  *     // other transforms etc
  *   )
  *   .forEach(
- *     noop,
+ *     process,
  *     () => {
  *       if (someCondition) {
  *         throw new NotAllObjectsProcessedError();

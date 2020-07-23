@@ -99,7 +99,7 @@ describe("transformers", () => {
 						resultPromise
 					).eventually.rejected.and.be.instanceOf(
 						NotAllObjectsProcessedError
-					); // This throws an unhandled promise rejection error, even if the source handles it!
+					); // This throws a rejection, when the source uses the default behavior of bouncing an error into result
 				})
 			);
 
@@ -122,7 +122,7 @@ describe("transformers", () => {
 							})
 						)
 						.transform(mapper(identity))
-						.forEach(noop, () => {
+						.forEach(process, () => {
 							if (someCondition) {
 								throw new NotAllObjectsProcessedError();
 							}
@@ -146,20 +146,15 @@ describe("transformers", () => {
 
 				const resultPromise = getSource()
 					.transform(
-						endCatcher((err: Error) => {
-							if (err.message !== "This is fine actually") {
-								throw err;
-							}
+						endCatcher(() => {
+							throw new Error("B");
 						})
 					)
-					.forEach(
-						noop,
-						() => {
-							throw new Error();
-						} /* ... */
-					);
+					.forEach(noop, () => {
+						throw new Error("A");
+					});
 
-				await expect(resultPromise).eventually.rejectedWith(Error);
+				await expect(resultPromise).eventually.rejectedWith("B");
 			})
 		);
 	});
