@@ -84,3 +84,81 @@ export function batcher<T>(
 		batch(readable, writable, maxBatchSize, options);
 	};
 }
+
+/**
+ * Transform to intercept downstream errors on stream end before they reach the
+ * upstream source and propagate back down.
+ *
+ * This is a niche utility. It only needs to be used when you want your *source* to
+ * recover from errors thrown by downstream enders.
+ *
+ * By default, any time a call to `end()` throws an error, that error gets thrown
+ * from the ended stream's `result()`. However, if the caller provides an upstream's
+ * `result()` as the second parameter to `end()`, this behaviour is averted and the
+ * stream's `result()` will instead depend on that Promise (which can be resolved
+ * or rejected as the upstream chooses).
+ *
+ * However, if it's the source that is calling `end()`, there is no upstream to use
+ * as the ender's second argument. This means the source cannot properly catch errors
+ * before they are sent to the downstream's `result()`.
+ *
+ * With the `endCatcher()` transform, you can simulate the behaviour of try-catch in
+ * this special case. To recover from the error, have `handleError()` return normally.
+ * To fail, simply re-throw the provided error (or a new, more appropriate Error).
+ *
+ * @example
+ * // Without endCatcher()
+ * getRowsFromDatabase<MyObject>(myQuery)
+ *   .transform(
+ *     // other transforms etc
+ *   )
+ *   .forEach(
+ *     process,
+ *     () => {
+ *       if (someCondition) {
+ *         throw new NotAllRowsProcessedError();
+ *       }
+ *     }
+ *   ); // This throws a rejection, when the source uses the default behavior of bouncing an error into result
+ *
+ * // With endCatcher()
+ * getRowsFromDatabase<MyObject>(myQuery)
+ *   .transform(
+ *     endCatcher((err: Error) => {
+ *       if (
+ *         err instanceof NotAllObjectsProcessedError
+ *       ) {
+ *         // ignore
+ *       } else {
+ *         // re-throw all other errors
+ *         throw err;
+ *       }
+ *     })
+ *   )
+ *   .transform(
+ *     // other transforms etc
+ *   )
+ *   .forEach(
+ *     process,
+ *     () => {
+ *       if (someCondition) {
+ *         throw new NotAllObjectsProcessedError();
+ *       }
+ *     }
+ *   ); // No longer throws the error, because handleError() returns successfully
+ *
+ * @param handleError
+ */
+export function endCatcher<T>(
+	handleError: (e: Error) => void | PromiseLike<void>
+): Transform<T, T> {
+	return (readable: Readable<T>, writable: Writable<T>): void => {
+		writable.aborted().catch((err) => readable.abort(err));
+		readable.aborted().catch((err) => writable.abort(err));
+		readable.forEach(
+			(value: T) => writable.write(value),
+			(error?: Error) =>
+				writable.end(error, readable.result()).catch(handleError)
+		);
+	};
+}
