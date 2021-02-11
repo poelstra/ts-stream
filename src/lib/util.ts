@@ -149,7 +149,12 @@ export interface TrackedVoidPromise extends TrackedPromise<void> {
 export function track(p: PromiseLike<void>): TrackedVoidPromise;
 export function track<T>(p: PromiseLike<T>): TrackedPromise<T>;
 export function track<T>(p: PromiseLike<T>): TrackedPromise<T> {
-	let tracked: TrackedPromise<T>;
+	const tracked: TrackedPromise<T> = {
+		isFulfilled: false,
+		isPending: true,
+		isRejected: false,
+		promise: undefined as any, // set later
+	};
 	const trackedPromise = p.then(
 		(value: T): T => {
 			tracked.isPending = false;
@@ -164,12 +169,7 @@ export function track<T>(p: PromiseLike<T>): TrackedPromise<T> {
 			throw error;
 		}
 	);
-	tracked = {
-		isFulfilled: false,
-		isPending: true,
-		isRejected: false,
-		promise: trackedPromise,
-	};
+	tracked.promise = trackedPromise;
 	return tracked;
 }
 
