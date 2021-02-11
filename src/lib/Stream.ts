@@ -8,8 +8,6 @@
 
 /* istanbul ignore next */ // ignores Typescript's __extend() function
 
-import * as assert from "assert";
-
 import BaseError from "./BaseError";
 import { filter, map, Transform } from "./Transform";
 import {
@@ -1579,7 +1577,9 @@ export class Stream<T> implements ReadableStream<T>, WritableStream<T> {
 		if (writer.value instanceof Eof) {
 			const eof = writer.value;
 			// EOF, with or without error
-			assert(!this._ended && !this._endPending);
+			if (this._ended || this._endPending) {
+				throw new Error("assertion failed");
+			}
 			this._endPending = eof;
 			const ender = this._ender!; // Ensure calling without `this`
 			this._ender = undefined; // Prevent calling again
