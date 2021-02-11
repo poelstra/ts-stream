@@ -166,7 +166,7 @@ export function batch<T>(
 			clearFlushTimeout();
 
 			timeout = setTimeout(() => {
-				if (!pendingWrite && queue.length > 0) {
+				if (!pendingWrite?.isPending && queue.length > 0) {
 					// NOTE If a normal flush() operation is in progress when this
 					// fires, this will slightly pressure the downstream reader.
 					// We could prevent this by tracking the promise of a normal

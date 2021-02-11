@@ -559,18 +559,25 @@ describe("Transform", () => {
 						value: 1,
 					},
 					{
-						value: 2,
 						wait: 3,
+						value: 2,
 					},
 					{
-						value: 3,
 						wait: 1,
+						value: 3,
 					},
 					{
 						value: 4,
 					},
 					{
 						value: 5,
+					},
+					{
+						wait: 3,
+						value: 6,
+					},
+					{
+						value: 7,
 					},
 				]);
 				const batched = pipeWithDelay(source).transform(
@@ -583,7 +590,8 @@ describe("Transform", () => {
 					[2, 3, 4], // Processed together because they arrived within the same window
 					//         and form a batch (3 arrives after 1ms delay which is within
 					//         2ms timeout)
-					[5], //    Processed alone because stream ends
+					[5], //    Processed alone because timeout fires
+					[6, 7], // Processed as short batch because stream ends
 				]);
 			})
 		);
