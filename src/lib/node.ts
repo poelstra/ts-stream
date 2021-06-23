@@ -9,7 +9,7 @@
 import * as fs from "fs";
 import * as NodeStream from "stream";
 
-import { Readable, Stream } from "./Stream";
+import { Readable, ReadableStream, Stream, WritableStream } from "./Stream";
 import { defer, swallowErrors, VoidDeferred } from "./util";
 
 /**
@@ -208,4 +208,76 @@ export function pipeToNodeStream<T>(
 		},
 		handleTsStreamError // abort handler
 	);
+}
+
+/**
+ * Create a ts-stream ReadableStream from a Node.JS ReadableStream.
+ *
+ * Reads all values from `nodeReadable` and writes them to the returned stream.
+ * When the `nodeReadable` ends, the returned stream is also ended.
+ * Should the `nodeReadable` emit a `close` event, the returned stream is ended without error.
+ * If the `nodeReadable` emits a `error` event, the returned stream is ended with the given error.
+ *
+ * Usage example:
+ * ```ts
+ * const source = fromNodeReadable(fs.createReadStream('source.txt'));
+ * source
+ *  .map((chunk) => String(chunk))
+ *  .map((letters) => letters.toUpperCase())
+ *  .forEach(console.log);
+ * ```
+ *
+ * @param nodeReadable Soource NodeJS stream
+ * @returns Readable stream of type `string | Buffer`
+ */
+export function fromNodeReadable(
+	nodeReadable: NodeJS.ReadableStream
+): ReadableStream<string | Buffer> {
+	const stream = new Stream<string | Buffer>();
+
+	const endStream = async (err?: Error) => {
+		if (!stream.isEndingOrEnded()) return stream.end(err);
+	};
+
+	stream.aborted().catch(endStream);
+	nodeReadable.once("close", endStream);
+	nodeReadable.once("error", endStream);
+
+	(async () => {
+		try {
+			for await (const chunk of nodeReadable) {
+				await stream.write(chunk);
+			}
+			await endStream();
+		} catch (err) {
+			await endStream(err as Error);
+		}
+	})();
+
+	return stream;
+}
+
+/**
+ * Create a ts-stream WritableStream from a Node.JS WritableStream.
+ *
+ * @see pipeToNodeStream for implementation details as this is a thinn wrapper.
+ *
+ * Usage example:
+ * ```ts
+ * const sink = toNodeWritable(fs.createWriteStream('sink.txt'));
+ * Stream.from(['some', 'lowercased', 'words'])
+ *  .map((chunk) => String(chunk))
+ *  .map((word) => word.toUpperCase())
+ *  .pipe(sink);
+ * ```
+ *
+ * @param nodeWriteable Destination NodeJS stream
+ * @returns Writable stream
+ */
+export function fromNodeWritable<T>(
+	nodeWriteable: NodeJS.WritableStream
+): WritableStream<T> {
+	const stream = new Stream<T>();
+	pipeToNodeStream(stream, nodeWriteable);
+	return stream;
 }
