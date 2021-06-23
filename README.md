@@ -222,6 +222,27 @@ sink.result().then(
 );
 ```
 
+## Working with NodeJS streams
+
+The `FileSink` class mentioned in the [Writing to a file](#writing-to-a-file) section is a specific wrapper around a NodeJS stream (`fs.createWriteStream`). There are a few more general-purpose functions available when working with NodeJS streams that you might find useful.
+
+```ts
+const source = Stream.from([1, 2, 3]);
+const dest: Express.Response = resp;
+// Pipe a ts-stream to some NodeJS stream.
+pipeToNodeStream(source, dest);
+```
+
+```ts
+// Convert a NodeJS readable stream to a ts-stream
+const source = fromNodeReadable(fs.createReadStream('test.txt'));
+// Convert a NodeJS writable stream to a ts-stream
+const dest = fromNodeWritable(fs.createWriteStream('all_caps.txt'));
+source
+  .map((chunk) => String(chunk))
+  .map((letters) => letter.toUpperCase())
+  .pipe(dest);
+```
 ## Error propagation
 
 Errors generated in `forEach()`'s read handler are 'returned' to the corresponding
