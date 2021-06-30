@@ -260,11 +260,11 @@ export function fromNodeReadable(
 /**
  * Create a ts-stream WritableStream from a Node.JS WritableStream.
  *
- * @see pipeToNodeStream for implementation details as this is a thinn wrapper.
+ * @see pipeToNodeStream for implementation details as this is a thin wrapper.
  *
  * Usage example:
  * ```ts
- * const sink = toNodeWritable(fs.createWriteStream('sink.txt'));
+ * const sink = fromNodeWritable(fs.createWriteStream('sink.txt'));
  * Stream.from(['some', 'lowercased', 'words'])
  *  .map((chunk) => String(chunk))
  *  .map((word) => word.toUpperCase())

@@ -243,6 +243,7 @@ source
   .map((letters) => letter.toUpperCase())
   .pipe(dest);
 ```
+
 ## Error propagation
 
 Errors generated in `forEach()`'s read handler are 'returned' to the corresponding
