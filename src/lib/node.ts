@@ -210,6 +210,7 @@ export function pipeToNodeStream<T>(
 	);
 }
 
+type FromNodeReadableDataType<T> = T extends void ? string | Buffer : T;
 /**
  * Create a ts-stream ReadableStream from a Node.JS ReadableStream.
  *
@@ -230,13 +231,25 @@ export function pipeToNodeStream<T>(
  * @param nodeReadable Soource NodeJS stream
  * @returns Readable stream of type `string | Buffer`
  */
-export function fromNodeReadable(
+export function fromNodeReadable<T = void>(
 	nodeReadable: NodeJS.ReadableStream
-): ReadableStream<string | Buffer> {
-	const stream = new Stream<string | Buffer>();
+): ReadableStream<FromNodeReadableDataType<T>> {
+	const stream = new Stream<FromNodeReadableDataType<T>>();
 
 	const endStream = async (err?: Error) => {
-		if (!stream.isEndingOrEnded()) return stream.end(err);
+		if (!stream.isEndingOrEnded()) {
+			/**
+			 * `stream.end` could reject, so we'll emit
+			 * any caught errors as an event via the NodeJS stream.
+			 * This is acceptable as we are only attempting to end
+			 * the ts-stream a maximum one time.
+			 */
+			try {
+				return stream.end(err);
+			} catch (e) {
+				nodeReadable.emit("error", e);
+			}
+		}
 	};
 
 	stream.aborted().catch(endStream);
@@ -246,7 +259,7 @@ export function fromNodeReadable(
 	(async () => {
 		try {
 			for await (const chunk of nodeReadable) {
-				await stream.write(chunk);
+				await stream.write(chunk as FromNodeReadableDataType<T>);
 			}
 			await endStream();
 		} catch (err) {
