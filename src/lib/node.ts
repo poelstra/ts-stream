@@ -210,7 +210,6 @@ export function pipeToNodeStream<T>(
 	);
 }
 
-type FromNodeReadableDataType<T> = T extends void ? string | Buffer : T;
 /**
  * Create a ts-stream ReadableStream from a Node.JS ReadableStream.
  *
@@ -231,43 +230,48 @@ type FromNodeReadableDataType<T> = T extends void ? string | Buffer : T;
  * @param nodeReadable Soource NodeJS stream
  * @returns Readable stream of type `string | Buffer`
  */
-export function fromNodeReadable<T = void>(
-	nodeReadable: NodeJS.ReadableStream
-): ReadableStream<FromNodeReadableDataType<T>> {
-	const stream = new Stream<FromNodeReadableDataType<T>>();
+export function fromNodeReadable<T = string | Buffer>(
+	nodeReadable: NodeStream.Readable
+): ReadableStream<T> {
+	const stream = new Stream<T>();
 
 	const endStream = async (err?: Error) => {
 		if (!stream.isEndingOrEnded()) {
-			/**
-			 * `stream.end` could reject, so we'll emit
-			 * any caught errors as an event via the NodeJS stream.
-			 * This is acceptable as we are only attempting to end
-			 * the ts-stream a maximum one time.
-			 */
 			try {
-				return stream.end(err);
+				await stream.end(err);
 			} catch (e) {
-				nodeReadable.emit("error", e);
+				nodeReadable.destroy(ensureError(e));
 			}
 		}
 	};
 
-	stream.aborted().catch(endStream);
-	nodeReadable.once("close", endStream);
-	nodeReadable.once("error", endStream);
+	const handleError = (err: unknown) => {
+		endStream(ensureError(err));
+		nodeReadable.destroy(ensureError(err));
+	};
+
+	stream.aborted().catch(handleError);
+	nodeReadable.once("error", handleError);
+	nodeReadable.once("close", () => endStream());
 
 	(async () => {
 		try {
 			for await (const chunk of nodeReadable) {
-				await stream.write(chunk as FromNodeReadableDataType<T>);
+				await stream.write((chunk as unknown) as T);
 			}
 			await endStream();
-		} catch (err) {
-			await endStream(err as Error);
+		} catch (e) {
+			handleError(e);
 		}
 	})();
 
 	return stream;
+}
+
+function ensureError(maybeError: unknown): Error {
+	return maybeError instanceof Error
+		? maybeError
+		: new Error(String(maybeError));
 }
 
 /**
@@ -288,7 +292,7 @@ export function fromNodeReadable<T = void>(
  * @returns Writable stream
  */
 export function fromNodeWritable<T>(
-	nodeWriteable: NodeJS.WritableStream
+	nodeWriteable: NodeStream.Writable
 ): WritableStream<T> {
 	const stream = new Stream<T>();
 	pipeToNodeStream(stream, nodeWriteable);
