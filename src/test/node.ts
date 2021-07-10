@@ -1,4 +1,5 @@
-import { expect } from "chai";
+import { rejects } from "assert";
+import { assert, expect } from "chai";
 import { Readable, Writable } from "stream";
 import { Stream } from "../lib/index";
 import { fromNodeWritable, fromNodeReadable } from "../lib/node";
@@ -64,24 +65,29 @@ describe("node", () => {
 
 			const stream = fromNodeReadable(nodeStream);
 
-			let ended: Error | undefined;
-			let aborted: Error | undefined;
-			await stream
-				.forEach(
-					// simulate a failing `write` call
-					(_chunk) => Promise.reject(new Error(errorMessage)),
-					(endErr) => {
-						ended = endErr;
-					},
-					(abortErr) => {
-						aborted = abortErr;
-					}
-				)
-				.catch((e) => e);
+			const ended = await new Promise<Error | undefined>(
+				(resolve, reject) => {
+					stream
+						.forEach(
+							// simulate a failing `write` call.
+							(_chunk) => Promise.reject(new Error(errorMessage)),
+							// resolve with the error value called on stream end.
+							resolve,
+							// reject should the aborter be called. (causes test to fail)
+							(_abortErr) => {
+								reject(
+									new Error(
+										"aborter callback not expected to be called"
+									)
+								);
+							}
+						)
+						.catch((e) => e);
+				}
+			);
 
 			expect(nodeStream.destroyed).to.equal(true);
 			expect(ended?.message).to.equal(errorMessage);
-			expect(aborted).to.equal(undefined);
 		});
 
 		it("it destroys the node stream and ends the ts-stream when the ts-stream's `end` call fails", async () => {
@@ -94,20 +100,27 @@ describe("node", () => {
 
 			const stream = fromNodeReadable(nodeStream);
 
-			let aborted: Error | undefined;
-			await stream
-				.forEach(
-					(_chunk) => Promise.resolve(),
-					// simulate a failing `end` call
-					(_endErr) => Promise.reject(new Error(errorMessage)),
-					(abortErr) => {
-						aborted = abortErr;
-					}
-				)
-				.catch((e) => e);
+			await new Promise<void>((resolve, reject) => {
+				stream
+					.forEach(
+						(_chunk) => Promise.resolve(),
+						// simulate a failing `end` call.
+						(_endErr) => {
+							resolve();
+							return Promise.reject(new Error(errorMessage));
+						},
+						// reject should the aborter be called. (causes test to fail)
+						(_abortErr) =>
+							reject(
+								new Error(
+									"aborter callback not expected to be called"
+								)
+							)
+					)
+					.catch((e) => e);
+			});
 
 			expect(nodeStream.destroyed).to.equal(true);
-			expect(aborted).to.equal(undefined);
 		});
 
 		it("it destroys the node stream and ends the ts-stream when the ts-stream's `write` and `end` calls fail", async () => {
@@ -121,21 +134,29 @@ describe("node", () => {
 
 			const stream = fromNodeReadable(nodeStream);
 
-			let aborted: Error | undefined;
-			await stream
-				.forEach(
-					// simulate a failing `write` call
-					(_chunk) => Promise.reject(new Error(writeErrorMessage)),
-					// simulate a failing `end` call
-					(_endErr) => Promise.reject(new Error(endErrorMessage)),
-					(abortErr) => {
-						aborted = abortErr;
-					}
-				)
-				.catch((e) => e);
+			await new Promise<void>((resolve, reject) => {
+				stream
+					.forEach(
+						// simulate a failing `write` call.
+						(_chunk) =>
+							Promise.reject(new Error(writeErrorMessage)),
+						// simulate a failing `end` call.
+						(_endErr) => {
+							resolve();
+							return Promise.reject(new Error(endErrorMessage));
+						},
+						// reject should the aborter be called. (causes test to fail)
+						(_abortErr) =>
+							reject(
+								new Error(
+									"aborter callback not expected to be called"
+								)
+							)
+					)
+					.catch((e) => e);
+			});
 
 			expect(nodeStream.destroyed).to.equal(true);
-			expect(aborted).to.equal(undefined);
 		});
 
 		it("it destroys the node stream and ends the ts-stream when the ts-stream is aborted", async () => {
@@ -151,25 +172,31 @@ describe("node", () => {
 			const stream = fromNodeReadable(nodeStream);
 			await stream.abort(new Error(errorMessage));
 
-			let ended: Error | undefined;
-			let aborted: Error | undefined;
-			const result = await stream
-				.forEach(
-					(_chunk) => Promise.resolve(),
-					(endErr) => {
-						ended = endErr;
-					},
-					(abortErr) => {
-						aborted = abortErr;
-					}
-				)
-				.catch((e) => e);
+			// Here we're waiting to resolve the promise until both the ender and aborter callbacks have been called.
+			const result = await new Promise<{
+				ended: Error | undefined;
+				aborted: Error | undefined;
+			}>((resolve) => {
+				let ended: Error | undefined;
+				let aborted: Error | undefined;
+				stream
+					.forEach(
+						(_chunk) => Promise.resolve(),
+						(endErr) => {
+							ended = endErr;
+							if (aborted) resolve({ ended, aborted });
+						},
+						(abortErr) => {
+							aborted = abortErr;
+							if (ended) resolve({ ended, aborted });
+						}
+					)
+					.catch((e) => e);
+			});
 
-			expect(result instanceof Error).to.equal(true);
-			expect(result.message).to.equal(errorMessage);
 			expect(nodeStream.destroyed).to.equal(true);
-			expect(ended?.message).to.equal(errorMessage);
-			expect(aborted?.message).to.equal(errorMessage);
+			expect(result.ended?.message).to.equal(errorMessage);
+			expect(result.aborted?.message).to.equal(errorMessage);
 		});
 	});
 
