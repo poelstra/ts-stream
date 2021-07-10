@@ -244,6 +244,16 @@ source
   .pipe(dest);
 ```
 
+It's worth noting that `fromNodeReadable` and `fromNodeWritable` take an optional generic type argument. It's advised that you provide the appropriate type for your NodeJS stream. For `fromNodeReadable` when no type argument is provided, the generated ts-stream will be of type `string | Buffer` (which is the type for each chunk for streams that are **not** in `objectMode`).
+
+```ts
+// Produces a ts-stream of type `Stream<string | Buffer>` (the default type).
+const a = fromNodeReadable(someNodeStreamNotInObjectMode);
+// When working with NodeJS streams in object mode you'll want to specify the type.
+// Produces a ts-stream of type `Stream<{ message: string; }>`.
+const b = fromNodeReadable<{ message: string; }>(someNodeStreamInObjectMode);
+```
+
 ## Error propagation
 
 Errors generated in `forEach()`'s read handler are 'returned' to the corresponding
