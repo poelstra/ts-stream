@@ -222,6 +222,38 @@ sink.result().then(
 );
 ```
 
+## Working with NodeJS streams
+
+The `FileSink` class mentioned in the [Writing to a file](#writing-to-a-file) section is a specific wrapper around a NodeJS stream (`fs.createWriteStream`). There are a few more general-purpose functions available when working with NodeJS streams that you might find useful.
+
+```ts
+const source = Stream.from([1, 2, 3]);
+const dest: Express.Response = resp;
+// Pipe a ts-stream to some NodeJS stream.
+pipeToNodeStream(source, dest);
+```
+
+```ts
+// Convert a NodeJS readable stream to a ts-stream
+const source = fromNodeReadable(fs.createReadStream('test.txt'));
+// Convert a NodeJS writable stream to a ts-stream
+const dest = fromNodeWritable(fs.createWriteStream('all_caps.txt'));
+source
+  .map((chunk) => String(chunk))
+  .map((letters) => letter.toUpperCase())
+  .pipe(dest);
+```
+
+It's worth noting that `fromNodeReadable` and `fromNodeWritable` take an optional generic type argument. It's advised that you provide the appropriate type for your NodeJS stream. For `fromNodeReadable` when no type argument is provided, the generated ts-stream will be of type `string | Buffer` (which is the type for each chunk for streams that are **not** in `objectMode`).
+
+```ts
+// Produces a ts-stream of type `Stream<string | Buffer>` (the default type).
+const a = fromNodeReadable(someNodeStreamNotInObjectMode);
+// When working with NodeJS streams in object mode you'll want to specify the type.
+// Produces a ts-stream of type `Stream<{ message: string; }>`.
+const b = fromNodeReadable<{ message: string; }>(someNodeStreamInObjectMode);
+```
+
 ## Error propagation
 
 Errors generated in `forEach()`'s read handler are 'returned' to the corresponding

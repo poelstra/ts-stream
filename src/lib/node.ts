@@ -9,7 +9,7 @@
 import * as fs from "fs";
 import * as NodeStream from "stream";
 
-import { Readable, Stream } from "./Stream";
+import { Readable, ReadableStream, Stream, WritableStream } from "./Stream";
 import { defer, swallowErrors, VoidDeferred } from "./util";
 
 /**
@@ -208,4 +208,93 @@ export function pipeToNodeStream<T>(
 		},
 		handleTsStreamError // abort handler
 	);
+}
+
+/**
+ * Create a ts-stream ReadableStream from a Node.JS ReadableStream.
+ *
+ * Reads all values from `nodeReadable` and writes them to the returned stream.
+ * When the `nodeReadable` ends, the returned stream is also ended.
+ * Should the `nodeReadable` emit a `close` event, the returned stream is ended without error.
+ * If the `nodeReadable` emits a `error` event, the returned stream is ended with the given error.
+ *
+ * Usage example:
+ * ```ts
+ * const source = fromNodeReadable(fs.createReadStream('source.txt'));
+ * source
+ *  .map((chunk) => String(chunk))
+ *  .map((letters) => letters.toUpperCase())
+ *  .forEach(console.log);
+ * ```
+ *
+ * @param nodeReadable Soource NodeJS stream
+ * @returns Readable stream of type `string | Buffer`
+ */
+export function fromNodeReadable<T = string | Buffer>(
+	nodeReadable: NodeStream.Readable
+): ReadableStream<T> {
+	const stream = new Stream<T>();
+
+	const endStream = async (err?: Error) => {
+		if (!stream.isEndingOrEnded()) {
+			try {
+				await stream.end(err);
+			} catch (e) {
+				nodeReadable.destroy(ensureError(e));
+			}
+		}
+	};
+
+	const handleError = (err: unknown) => {
+		endStream(ensureError(err));
+		nodeReadable.destroy(ensureError(err));
+	};
+
+	stream.aborted().catch(handleError);
+	nodeReadable.once("error", handleError);
+	nodeReadable.once("close", () => endStream());
+
+	(async () => {
+		try {
+			for await (const chunk of nodeReadable) {
+				await stream.write((chunk as unknown) as T);
+			}
+			await endStream();
+		} catch (e) {
+			handleError(e);
+		}
+	})();
+
+	return stream;
+}
+
+function ensureError(maybeError: unknown): Error {
+	return maybeError instanceof Error
+		? maybeError
+		: new Error(String(maybeError));
+}
+
+/**
+ * Create a ts-stream WritableStream from a Node.JS WritableStream.
+ *
+ * @see pipeToNodeStream for implementation details as this is a thin wrapper.
+ *
+ * Usage example:
+ * ```ts
+ * const sink = fromNodeWritable(fs.createWriteStream('sink.txt'));
+ * Stream.from(['some', 'lowercased', 'words'])
+ *  .map((chunk) => String(chunk))
+ *  .map((word) => word.toUpperCase())
+ *  .pipe(sink);
+ * ```
+ *
+ * @param nodeWriteable Destination NodeJS stream
+ * @returns Writable stream
+ */
+export function fromNodeWritable<T>(
+	nodeWriteable: NodeStream.Writable
+): WritableStream<T> {
+	const stream = new Stream<T>();
+	pipeToNodeStream(stream, nodeWriteable);
+	return stream;
 }
